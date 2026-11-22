@@ -32,14 +32,17 @@ type Weights struct {
 	KanaSize             float64 // small/full-size vowel in ウィ, ウェ or シェ
 	ShiShu               float64 // シ/シュ in Japanese or foreign names
 	RiRu                 float64 // リ/ル under foreign-name rules
+	RD                   float64 // contextual ラ/ダ, リ/ディ, レ/デ and ロ/ド
 	MedialVoicing        float64 // voiced/unvoiced pairs after the first mora
 	InitialKS            float64 // same vowel with k/s in the first mora
+	MedialLoss           float64 // one missing interior mora of the registered reading
 	TailLoss             float64 // one missing final ordinary mora of the reference
 	HeadLoss             float64 // Find/Mask: omit the first mora if six vowel-bearing moras remain
 	Other                float64 // other mora insertions, deletions and substitutions
 	Hiragana             float64 // per observed mora originally written in hiragana
 	TwoMoraMaxCost       float64 // Find/Mask ceiling for two moras; +Inf uses the caller's limit
 	ExactSingleMora      bool    // require identical normalized sounds for a one-mora candidate
+	LimitByMoraCount     bool    // extra Find/Mask ceilings: 1.5 through 6 moras, 1.75 through 9, then 2
 }
 
 // DefaultWeights returns initial ranking costs, not estimated probabilities.
@@ -47,8 +50,8 @@ func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 0.75, LongDeletion: 0.75,
 		TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
-		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5,
-		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
+		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
+		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
 	}
 }
@@ -86,7 +89,7 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 	case JapaneseRules:
 		w.FinalLongLoss, w.Geminate, w.BV = off, off, off
 		w.TiChi, w.KanaSize, w.GlideAfterOU = off, off, off
-		w.RiRu = off
+		w.RiRu, w.RD = off, off
 	case ForeignRules:
 		w.VowelLoss, w.InitialKS, w.KuGemination = off, off, off
 		w.RepeatedVowelPenalty = 0
@@ -138,7 +141,7 @@ func New(names []Name, w Weights) (*Matcher, error) {
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
-		w.BV, w.ShiShu, w.RiRu, w.MedialVoicing, w.InitialKS, w.KuGemination, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
+		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -241,6 +244,9 @@ func (w *ruleWeights) gap(u []unit, i int, other []unit, end int, reference bool
 		return math.Inf(1)
 	}
 	cost := w.Other
+	if reference && i > 0 && i+1 < len(u) {
+		cost = math.Min(cost, w.MedialLoss)
+	}
 	if i > 0 && end > 0 {
 		prev := u[i-1].sound
 		aligned := other[end-1].sound
@@ -282,6 +288,24 @@ func phonetic(s string) bool {
 	return len(s) > 0 && (s[0] >= 'a' && s[0] <= 'z' || s == "^" || s == ":")
 }
 
+// Compare the two neighboring moras, using two on the same side at a name boundary.
+func matchingRDContext(a, b []unit, i, j int) bool {
+	if len(a) < 3 {
+		return false
+	}
+	start := min(max(0, i-1), len(a)-3)
+	observed := j - (i - start)
+	if observed < 0 || observed+3 > len(b) {
+		return false
+	}
+	for k := range 3 {
+		if start+k != i && (!phonetic(a[start+k].sound) || a[start+k].sound != b[observed+k].sound) {
+			return false
+		}
+	}
+	return true
+}
+
 func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	x, y := a[i].sound, b[j].sound
 	if x == y {
@@ -316,6 +340,9 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	}
 	if riRuPartner[x] == y {
 		cost = math.Min(cost, w.RiRu)
+	}
+	if rdPartner[x] == y && matchingRDContext(a, b, i, j) {
+		cost = math.Min(cost, w.RD)
 	}
 	if i > 0 && j > 0 {
 		if voicingPartner[x] == y || w.scope != JapaneseRules && foreignVoicingPartner[x] == y {
@@ -363,6 +390,7 @@ var voicingPartner = partners("ka/ga ki/gi ku/gu ke/ge ko/go sa/za shi/ji su/zu 
 var foreignVoicingPartner = partners("je/she ba/pa")
 var shiShuPartner = partners("shi/shu")
 var riRuPartner = partners("ri/ru")
+var rdPartner = partners("ra/da ri/di re/de ro/do")
 var ksPartner = partners("ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho")
 
 // One compact mora aligns to both sounds of its full-size spelling in one edit.
@@ -403,6 +431,17 @@ func startsKuGemination(b []unit, j int) bool {
 // Tokenization keeps separators for alignment, but they add no spoken length.
 func countsTowardLength(t unit) bool {
 	return t.sound != " " && t.sound != "'" && t.sound != ""
+}
+
+func moraCostLimit(moras int) float64 {
+	switch {
+	case moras <= 6:
+		return 1.5
+	case moras <= 9:
+		return 1.75
+	default:
+		return 2
+	}
 }
 
 // Count only independent vowel-bearing moras. A long vowel spelled with a
@@ -504,6 +543,9 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 				continue
 			}
 			cost := prev[len(a)]
+			if w.LimitByMoraCount && cost > moraCostLimit(shorter) {
+				continue
+			}
 			if shorter == 2 && cost > w.TwoMoraMaxCost {
 				continue
 			}
@@ -571,6 +613,9 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 	if w.RiRu <= limit {
 		add(riRuPartner[first])
 	}
+	if w.RD <= limit && len(form) >= 3 {
+		add(rdPartner[first])
+	}
 	if w.InitialKS <= limit {
 		add(ksPartner[first])
 	}
@@ -599,16 +644,26 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 		w := &m.rules[name.rules]
 		var hits []Match
 		for _, form := range name.forms {
+			limit := maxCost
+			if w.LimitByMoraCount {
+				moras := 0
+				for _, t := range form {
+					if countsTowardLength(t) {
+						moras++
+					}
+				}
+				limit = min(limit, moraCostLimit(moras))
+			}
 			rows := make([]float64, 3*(len(form)+1))
-			omitHead := w.HeadLoss <= maxCost && canOmitHead(form)
+			omitHead := w.HeadLoss <= limit && canOmitHead(form)
 			check := func(i int) {
-				end, c := w.align(form, tokens[i:], rows, maxCost, true, omitHead)
+				end, c := w.align(form, tokens[i:], rows, limit, true, omitHead)
 				if end > 0 && !math.IsInf(c, 1) {
 					hits = append(hits, Match{name.text, index, tokens[i].start, tokens[i+end-1].end, c})
 				}
 			}
-			if maxCost < w.Other {
-				for _, sound := range w.initialSounds(form, maxCost, omitHead) {
+			if limit < w.Other {
+				for _, sound := range w.initialSounds(form, limit, omitHead) {
 					for _, i := range positions[sound] {
 						check(i)
 					}

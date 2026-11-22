@@ -26,40 +26,45 @@ func TestRuleSetDistances(t *testing.T) {
 	}{
 		{"イシイカオリ", "イシーカオリ", 0, 0, 0},
 		{"ヤマザキケント", "ヤマサキケント", .25, .25, .25},
-		{"サイトウミホ", "サトウミホ", .25, .25, 2},
-		{"カトウミホ", "サトウミホ", .5, .5, 2},
+		{"サイトウミホ", "サトウミホ", .25, .25, 1},
+		{"カトウミホ", "サトウミホ", .5, .5, 1},
 		{"オオノユウスケ", "オノユースケ", .25, .25, .75},
 		{"デビットマッキー", "デービットマッキー", .25, .75, .25},
-		{"デビットマッキー", "デビトマッキー", .25, 2, .25},
-		{"アントニオヴィバルディ", "アントニオビバルディ", .25, 2, .25},
-		{"ジェームズ・パジェット", "ジェームス・パシェット", .5, 2.25, .5},
-		{"ジェームス・パシェット", "ジェームズ・パジェット", .5, 2.25, .5},
-		{"ジェームズ・パジェット", "シェームズ・パジェット", 2, 2, 2},
+		{"デビットマッキー", "デビトマッキー", .25, 1, .25},
+		{"アントニオヴィバルディ", "アントニオビバルディ", .25, 1, .25},
+		{"ジェームズ・パジェット", "ジェームス・パシェット", .5, 1.25, .5},
+		{"ジェームス・パシェット", "ジェームズ・パジェット", .5, 1.25, .5},
+		{"ジェームズ・パジェット", "シェームズ・パジェット", 1, 1, 1},
 		{"キム・シウ", "キム・シュウ", .5, .5, .5},
 		{"kimusyuu", "kimusiu", .5, .5, .5},
 		{"タナカしゅうじ", "タナカシウジ", .5, .5, .5},
 		{"タナカシウジ", "タナカシュウジ", .5, .5, .5},
-		{"ジョシュ・ホーキンソン", "ジョジホーキンソン", .75, 2, .75},
-		{"ジョジホーキンソン", "ジョシュ・ホーキンソン", .75, 2, .75},
-		{"ジェームズ・バリ", "ジェームス・パル", 1, 4.25, 1},
-		{"ジェームス・パル", "ジェームズ・バリ", 1, 4.25, 1},
-		{"キム・ミウ", "キム・ムウ", 2, 2, 2},
-		{"マーティンホール", "マーチンホール", .25, 2, .25},
-		{"ウィリアムモリス", "ウイリアムモリス", .25, 4, .25},
+		{"ジョシュ・ホーキンソン", "ジョジホーキンソン", .75, 1, .75},
+		{"ジョジホーキンソン", "ジョシュ・ホーキンソン", .75, 1, .75},
+		{"ジェームズ・バリ", "ジェームス・パル", 1, 2.25, 1},
+		{"ジェームス・パル", "ジェームズ・バリ", 1, 2.25, 1},
+		{"キム・ミウ", "キム・ムウ", 1, 1, 1},
+		{"マーティンホール", "マーチンホール", .25, 1, .25},
+		{"ウィリアムモリス", "ウイリアムモリス", .25, 2, .25},
 		{"リーエディー", "リーエディ", .125, .75, .125},
-		{"レジェップタイイップエルドアン", "レジェップタイイップエルドワン", .5, 2, .5},
-		{"エルモア・ジェイムズ", "エルモはジェームズ", .625, 2, .625},
+		{"レジェップタイイップエルドアン", "レジェップタイイップエルドワン", .5, 1, .5},
+		{"エルモア・ジェイムズ", "エルモはジェームズ", .625, 1, .625},
 		{"オトワユウスケ", "オトはユウスケ", .125, .125, .125},
-		{"オトハユウスケ", "オトワユウスケ", 2, 2, 2},
+		{"オトハユウスケ", "オトワユウスケ", 1, 1, 1},
 		{"オオノデビット", "オノデービット", .5, 1, 1},
-		{"キクチユウスケ", "キチユウスケ", 2, 2, 2},
-		{"タナカキクコ", "タナカキッコ", .5, .5, 2},
-		{"フクカワミホ", "フッカワミホ", .5, .5, 2},
-		{"satoukikuko", "satoukikko", .5, .5, 2},
-		{"サトウキッコ", "サトウキクコ", 2, 2, 2},
-		{"タナカイクミ", "タナカイッミ", 2, 2, 2},
-		{"タナカアキコ", "タナカアッコ", 2, 2, 2},
-		{"サトウキクコ", "サトウキッケ", 4, 4, 4},
+		{"キクチユウスケ", "キチユウスケ", 1, 1, 1},
+		{"キチユウスケ", "キクチユウスケ", 1, 1, 1},
+		{"ジャンカルロ・フィジケラ", "ジャン・カルド・フィジケラ", 0.5, 1, 0.5},
+		{"リー・シェン・ルーン", "ディー・シェン・ルーン", 0.5, 1, 0.5},
+		{"ジャン・カルド", "ジャン・カルロ", 0.5, 1, 0.5},
+		{"リー・シェン・ルーン", "ティー・シェン・ルーン", 1, 1, 1},
+		{"タナカキクコ", "タナカキッコ", .5, .5, 1},
+		{"フクカワミホ", "フッカワミホ", .5, .5, 1},
+		{"satoukikuko", "satoukikko", .5, .5, 1},
+		{"サトウキッコ", "サトウキクコ", 1, 1, 1},
+		{"タナカイクミ", "タナカイッミ", 1, 1, 1},
+		{"タナカアキコ", "タナカアッコ", 1, 1, 1},
+		{"サトウキクコ", "サトウキッケ", 2, 2, 2},
 	} {
 		for scope, want := range []float64{tc.all, tc.japanese, tc.foreign} {
 			if got := m.DistanceWithRules(tc.ref, tc.obs, RuleSet(scope)); got != want {
@@ -89,6 +94,7 @@ func TestRuleSetDistances(t *testing.T) {
 
 func TestHighVowelWeights(t *testing.T) {
 	w := DefaultWeights()
+	w.Other = 2 // Exercise a combined phonetic cost above one ordinary edit.
 	w.ShiShu = .625
 	w.RiRu = .875
 	w.MedialVoicing = .5
@@ -131,6 +137,95 @@ func TestJapaneseShujiMask(t *testing.T) {
 	}
 }
 
+func TestRDCostAndContext(t *testing.T) {
+	const name, text = "リー・シェン・ルーン", "会談にはディー・シェン・ルーン首相が出席。"
+	w := DefaultWeights()
+	w.RD = .75
+	m := mustNew(t, w, Name{Text: name})
+	if got := m.Mask(text, .75, "■"); got != "会談には■首相が出席。" {
+		t.Errorf("mask with initial RD at threshold: %q", got)
+	}
+	if got := m.Mask(text, .74, "■"); got != text {
+		t.Errorf("mask below threshold: %q", got)
+	}
+	// The initial vowel length also changed, so the two following moras do not match.
+	if got := m.Distance(name, "ディ・シェン・ルーン"); got != w.Other+w.LongDeletion {
+		t.Errorf("RD without matching context: got %g", got)
+	}
+	w.RD = math.Inf(1)
+	if got := mustNew(t, w, Name{Text: name}).Mask(text, .75, "■"); got != text {
+		t.Errorf("disabled RD: %q", got)
+	}
+	w.RD = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative RD cost")
+	}
+}
+
+func TestDefaultMoraEdits(t *testing.T) {
+	const name = "ヤマモトユウスケ"
+	m := mustNew(t, DefaultWeights(), Name{Text: "ジャンカルロ・フィジケラ"})
+	for _, observed := range []string{"ヤマモトユススケ", "ヤマモトフユウスケ", "ヤモトユウスケ"} {
+		if got := m.Distance(name, observed); got != 1 {
+			t.Errorf("Distance(%q, %q) = %g, want 1", name, observed, got)
+		}
+	}
+	if got := m.Mask("受付は「ジャン・カルド・フィケラ」です。", 1.5, "■"); got != "受付は「■」です。" {
+		t.Errorf("RD plus a missing medial mora: %q", got)
+	}
+}
+
+func TestMoraCountLimits(t *testing.T) {
+	for n, want := range map[int]float64{6: 1.5, 7: 1.75, 8: 1.75, 9: 1.75, 10: 2, 20: 2} {
+		if got := moraCostLimit(n); got != want {
+			t.Errorf("limit at %d moras = %g, want %g", n, got, want)
+		}
+	}
+	w := DefaultWeights()
+	w.LimitByMoraCount = true
+	for _, tc := range []struct {
+		name, observed string
+		limit          float64
+		match          bool
+	}{
+		{"ヤマモトユウスケ", "やまもとゆうハケ", 2, true},      // 8 moras, cost 1.75
+		{"ヤマモトユウスケ", "やまもとゆうハケ", 1.5, false},   // caller's lower ceiling
+		{"アレクサンドル・ペトロ", "アレクサンドルモタロ", 2, true}, // 10 moras, cost 2
+		{"アレクサンドル・ペトロ", "アレクンドルモトロ", 2, false}, // 9 observed moras, cost 2
+	} {
+		m := mustNew(t, w, Name{Text: tc.name})
+		text := "受付は「" + tc.observed + "」です。"
+		want := text
+		if tc.match {
+			want = "受付は「■」です。"
+		}
+		if got := m.Mask(text, tc.limit, "■"); got != want {
+			t.Errorf("Mask(%q, %g) = %q, want %q", text, tc.limit, got, want)
+		}
+	}
+}
+
+func TestMedialLossMask(t *testing.T) {
+	const name, text = "タナカユウスケ", "受付は「タカユウスケ」です。"
+	w := DefaultWeights()
+	w.Other = 2 // Isolate the configurable medial deletion from its fallback.
+	for _, cost := range []float64{w.MedialLoss, 1.5, 1.75, math.Inf(1)} {
+		w.MedialLoss = cost
+		m := mustNew(t, w, Name{Text: name})
+		want := text
+		if cost <= 1.5 {
+			want = "受付は「■」です。"
+		}
+		if got := m.Mask(text, 1.5, "■"); got != want {
+			t.Errorf("MedialLoss=%g: got %q, want %q", cost, got, want)
+		}
+	}
+	w.MedialLoss = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative MedialLoss cost")
+	}
+}
+
 func TestKuGeminationMask(t *testing.T) {
 	const name = "サトウキクコ"
 	w := DefaultWeights()
@@ -159,7 +254,7 @@ func TestKuGeminationMask(t *testing.T) {
 	}
 	w.KuGemination = math.Inf(1)
 	m = mustNew(t, w, Name{Text: name})
-	if got := m.Mask("サトウキッコ", 1.5, "■"); got != "サトウキッコ" {
+	if got := m.Mask("サトウキッコ", .5, "■"); got != "サトウキッコ" {
 		t.Errorf("disabled rule: %q", got)
 	}
 	w.KuGemination = -1
@@ -223,7 +318,7 @@ func TestPhoneticRules(t *testing.T) {
 		{"デイビットマッキー", "デービットマッキー", 0}, {"デイビットマッキー", "デビットマッキー", .25},
 		{"debi^tomakki:", "デビトマッキー", .25}, {"デビトマッキー", "デビットマッキー", .25}, {"ミシェルモラン", "ミッシェルモラン", .25},
 		{"マーティンホール", "マーチンホール", .25}, {"ジョセフスミス", "ジョゼフスミス", .25}, {"リーエディー", "リーエディ", .125}, {"ジョンガルーチ", "ジョンガルチ", .25},
-		{"デービッドマッキー", "デビトマッキー", .75}, {"タナカミホ", "タナッカミホ", 2}, {"タナカミホ", "タッナカミホ", 2},
+		{"デービッドマッキー", "デビトマッキー", .75}, {"タナカミホ", "タナッカミホ", 1}, {"タナカミホ", "タッナカミホ", 1},
 		{"ｱﾝﾄﾆｵ･ｳﾞｨｳﾞｧﾙﾃﾞｨ", "アントニオヴィヴァルディ", 0}, {"イシイ・カオリ", "いしーかおり", 0},
 	} {
 		if got := m.Distance(tc.a, tc.b); got != tc.want {
@@ -263,8 +358,8 @@ func TestGlideAfterOU(t *testing.T) {
 	}{
 		{"レセップタイップエルドアン", "レセップタイップエルドワン", .5},
 		{"トゥプアタマセーゼレアロフィ", "トゥプワタマセーゼレアロフィ", .5},
-		{"ヨシダアヤ", "ヨシダワヤ", 2},                 // The preceding vowel is a.
-		{"レセップタイップエルドアン", "レセップタイップエルドワル", 4}, // The following sounds differ.
+		{"ヨシダアヤ", "ヨシダワヤ", 1},                 // The preceding vowel is a.
+		{"レセップタイップエルドアン", "レセップタイップエルドワル", 2}, // The following sounds differ.
 	} {
 		if got := m.Distance(tc.a, tc.b); got != tc.want {
 			t.Errorf("%s -> %s: got %g, want %g", tc.a, tc.b, got, tc.want)
@@ -292,11 +387,11 @@ func TestObservedHaAsWa(t *testing.T) {
 		{name, "エルモワジェームズ", .25},
 		{name, "エルモはジェームズ", .375},
 		{"エルモワジェイムズ", "エルモはジェームズ", .125},
-		{name, "エルモハジェームズ", 2},
-		{name, "エルモhaジェームズ", 2},
-		{"エルモはジェームズ", name, 2},
-		{"ヨシダアヤ", "ヨシダはヤ", 2},
-		{name, "エルモはシェームズ", 2.25},
+		{name, "エルモハジェームズ", 1},
+		{name, "エルモhaジェームズ", 1},
+		{"エルモはジェームズ", name, 1},
+		{"ヨシダアヤ", "ヨシダはヤ", 1},
+		{name, "エルモはシェームズ", 1.25},
 	} {
 		if got := m.Distance(tc.ref, tc.obs); got != tc.want {
 			t.Errorf("Distance(%q, %q) = %g, want %g", tc.ref, tc.obs, got, tc.want)
@@ -396,6 +491,7 @@ func TestFullSizeKana(t *testing.T) {
 
 func TestMaskLongSuffix(t *testing.T) {
 	w := DefaultWeights()
+	w.Other, w.HeadLoss = 2, 1.25 // Isolate the search-only head discount.
 	m := mustNew(t, w, Name{Text: "セオドアトーマス"})
 	text := "指揮はスイオドア・トマス。"
 	h := m.Find(text, 1.5)
@@ -509,7 +605,7 @@ func TestInvalidAndDisabled(t *testing.T) {
 	w := DefaultWeights()
 	w.BV = math.Inf(1)
 	m := mustNew(t, w, Name{Text: "アントニオビバルディ"})
-	if got := m.Find("アントニオヴィバルディ", 1.5); len(got) != 0 {
+	if got := m.Find("アントニオヴィバルディ", .5); len(got) != 0 {
 		t.Errorf("disabled b/v: %+v", got)
 	}
 	if got := m.Find("アントニオビバルディ", math.NaN()); len(got) != 0 {
@@ -544,14 +640,14 @@ func ExampleMatcher_Find() {
 func TestTunableRulesAndSearchFallback(t *testing.T) {
 	w := DefaultWeights()
 	w.EiSpelling, w.OuSpelling = .125, .5
-	w.Geminate, w.InitialKS, w.TailLoss = .5, 1, 1.25
+	w.Geminate, w.InitialKS, w.TailLoss = .5, 1, .875
 	m := mustNew(t, w, Name{Text: "石井 香織", Readings: []string{"イシーカオリ"}}, Name{Text: "サトウミホ"})
 	for _, tc := range []struct {
 		a, b string
 		want float64
 	}{
 		{"キムラセイスケ", "キムラセースケ", .125}, {"サトウミホ", "サトーミホ", .5},
-		{"デビットマッキー", "デビトマッキー", .5}, {"サトウミホ", "カトウミホ", 1}, {"いしだりょうた", "いしだりょう", 1.25},
+		{"デビットマッキー", "デビトマッキー", .5}, {"サトウミホ", "カトウミホ", 1}, {"いしだりょうた", "いしだりょう", .875},
 	} {
 		if got := m.Distance(tc.a, tc.b); got != tc.want {
 			t.Errorf("%s/%s = %g, want %g", tc.a, tc.b, got, tc.want)
@@ -563,8 +659,8 @@ func TestTunableRulesAndSearchFallback(t *testing.T) {
 	// Once ordinary edits are affordable, a name can start with an
 	// arbitrary substituted mora. The indexed path must not omit this hit.
 	m = mustNew(t, DefaultWeights(), Name{Text: "キムラアヤ"})
-	hits := m.Find("昨日、タムラアヤさん。", 2)
-	if len(hits) != 1 || hits[0].Start != len("昨日、") || hits[0].End != len("昨日、タムラアヤ") || hits[0].Cost != 2 {
+	hits := m.Find("昨日、タムラアヤさん。", 1)
+	if len(hits) != 1 || hits[0].Start != len("昨日、") || hits[0].End != len("昨日、タムラアヤ") || hits[0].Cost != 1 {
 		t.Errorf("%+v", hits)
 	}
 }
@@ -589,7 +685,7 @@ func TestDirectionalLengthCosts(t *testing.T) {
 		{"ニナフェドロフ", "ニーナフェドロフ", .25, .25}, {"ニコマリ", "ニコマリー", .125, .125},
 		{"セオドアトマス", "セオドアトーマス", .25, .25}, {"イトマキコ", "イトーマキコ", .75, .75},
 		{"ヤマモトヨハン", "ヤマモトヨーハン", .25, .25},
-		{"マリニコ", "マリーニコ", .25, .25}, {"タナカミホ", "タナーーカミホ", 2.75, 2.75},
+		{"マリニコ", "マリーニコ", .25, .25}, {"タナカミホ", "タナーーカミホ", 1.75, 1.75},
 	} {
 		if got := m.Distance(tc.short, tc.long); got != tc.insert {
 			t.Errorf("%s -> %s: %g, want %g", tc.short, tc.long, got, tc.insert)
@@ -618,15 +714,15 @@ func TestLengthSettings(t *testing.T) {
 	}
 	// A raised search limit lets the two-mora surname fragment test the cap
 	// independently of the cost of dropping the given name.
-	for _, cap := range []float64{1, 2.75, 3, math.Inf(1)} {
+	for _, cap := range []float64{1, 1.75, 2, math.Inf(1)} {
 		w := DefaultWeights()
 		w.TwoMoraMaxCost = cap
 		m := mustNew(t, w, Name{Text: "オノアキ"})
 		for _, sample := range []struct {
 			text string
 			cost float64
-		}{{"オノ", 2.75}, {"おの", 3}} {
-			for _, limit := range []float64{1.5, 2.75, 3} {
+		}{{"オノ", 1.75}, {"おの", 2}} {
+			for _, limit := range []float64{1.5, 1.75, 2} {
 				got := len(m.Find(sample.text, limit)) != 0
 				if want := sample.cost <= min(cap, limit); got != want {
 					t.Errorf("%s cap=%g limit=%g hit=%v, want %v", sample.text, cap, limit, got, want)
@@ -656,9 +752,6 @@ func TestRelaxedTwoMoraCorpus(t *testing.T) {
 	t.Run("two-mora", func(t *testing.T) { checkTranscriptCorpus(t, w, nil) })
 
 	w.LongInsertion, w.RepeatedVowelPenalty = 1.5, 2
-	want := map[string]string{
-		"length-tanaka":       "ターナカミホ、タナーカミホ、■。",
-		"joined-no-expansion": "ヤマモトヨーシコさん。",
-	}
-	t.Run("higher-insertion-cost", func(t *testing.T) { checkTranscriptCorpus(t, w, want) })
+	// An ordinary insertion still costs 1 when the special length rule costs more.
+	t.Run("higher-insertion-cost", func(t *testing.T) { checkTranscriptCorpus(t, w, nil) })
 }
