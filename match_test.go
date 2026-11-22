@@ -53,6 +53,13 @@ func TestRuleSetDistances(t *testing.T) {
 		{"オトハユウスケ", "オトワユウスケ", 2, 2, 2},
 		{"オオノデビット", "オノデービット", .5, 1, 1},
 		{"キクチユウスケ", "キチユウスケ", 2, 2, 2},
+		{"タナカキクコ", "タナカキッコ", .5, .5, 2},
+		{"フクカワミホ", "フッカワミホ", .5, .5, 2},
+		{"satoukikuko", "satoukikko", .5, .5, 2},
+		{"サトウキッコ", "サトウキクコ", 2, 2, 2},
+		{"タナカイクミ", "タナカイッミ", 2, 2, 2},
+		{"タナカアキコ", "タナカアッコ", 2, 2, 2},
+		{"サトウキクコ", "サトウキッケ", 4, 4, 4},
 	} {
 		for scope, want := range []float64{tc.all, tc.japanese, tc.foreign} {
 			if got := m.DistanceWithRules(tc.ref, tc.obs, RuleSet(scope)); got != want {
@@ -121,6 +128,43 @@ func TestJapaneseShujiMask(t *testing.T) {
 	}
 	if got := m.Mask(text, .875, "■"); got != "担当は■さん、次は■さんです。" {
 		t.Errorf("including three hiragana moras: got %q", got)
+	}
+}
+
+func TestKuGeminationMask(t *testing.T) {
+	const name = "サトウキクコ"
+	w := DefaultWeights()
+	m := mustNew(t, w, Name{Text: name})
+	for _, tc := range []struct {
+		observed string
+		cost     float64
+	}{
+		{"サトウキッコ", .5},
+		{"さとうきっこ", 1.25},
+		{"satoukikko", .5},
+	} {
+		text := "受付は「" + tc.observed + "」です。"
+		hits := m.Find(text, tc.cost)
+		if len(hits) != 1 || hits[0].Cost != tc.cost || text[hits[0].Start:hits[0].End] != tc.observed {
+			t.Errorf("Find(%q): %+v", text, hits)
+		}
+		if m.Mask(text, 1.5, "■") != "受付は「■」です。" || m.Mask(text, tc.cost-.01, "■") != text {
+			t.Errorf("unexpected mask or threshold for %q", text)
+		}
+	}
+	w.KuGemination = .25
+	m = mustNew(t, w, Name{Text: name})
+	if got := m.Mask("サトウキッコ。サトウキッ。コ", .25, "■"); got != "■。サトウキッ。コ" {
+		t.Errorf("tuned cost and span: %q", got)
+	}
+	w.KuGemination = math.Inf(1)
+	m = mustNew(t, w, Name{Text: name})
+	if got := m.Mask("サトウキッコ", 1.5, "■"); got != "サトウキッコ" {
+		t.Errorf("disabled rule: %q", got)
+	}
+	w.KuGemination = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative KuGemination cost")
 	}
 }
 

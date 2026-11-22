@@ -26,6 +26,7 @@ type Weights struct {
 	GlideAfterOU         float64 // medial ア/ワ after a matching o/u mora and before a matching sound
 	HaAsWa               float64 // cost to read an observed hiragana は as ワ in the same context
 	Geminate             float64 // contextual presence/absence of ッ
+	KuGemination         float64 // medial ク before a k mora realized as ッ (キクコ -> キッコ)
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
 	KanaSize             float64 // small/full-size vowel in ウィ, ウェ or シェ
@@ -46,7 +47,7 @@ func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 0.75, LongDeletion: 0.75,
 		TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
-		GlideAfterOU: 0.25, HaAsWa: 0.125,
+		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
 	}
@@ -87,7 +88,7 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 		w.TiChi, w.KanaSize, w.GlideAfterOU = off, off, off
 		w.RiRu = off
 	case ForeignRules:
-		w.VowelLoss, w.InitialKS = off, off
+		w.VowelLoss, w.InitialKS, w.KuGemination = off, off, off
 		w.RepeatedVowelPenalty = 0
 	}
 	return ruleWeights{Weights: w, scope: scope}
@@ -137,7 +138,7 @@ func New(names []Name, w Weights) (*Matcher, error) {
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
-		w.BV, w.ShiShu, w.RiRu, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
+		w.BV, w.ShiShu, w.RiRu, w.MedialVoicing, w.InitialKS, w.KuGemination, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -390,6 +391,15 @@ func fullSizeKana(compact string) (string, string) {
 	return "", ""
 }
 
+// A medial ッ and the following k mora must both fall inside the match.
+func startsKuGemination(b []unit, j int) bool {
+	if j <= 0 || j+1 >= len(b) || b[j].sound != "^" || vowel(b[j-1].sound) == 0 {
+		return false
+	}
+	next := b[j+1].sound
+	return strings.HasPrefix(next, "k") && vowel(next) != 0
+}
+
 // Tokenization keeps separators for alignment, but they add no spoken length.
 func countsTowardLength(t unit) bool {
 	return t.sound != " " && t.sound != "'" && t.sound != ""
@@ -448,6 +458,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 		low := curr[0]
 		compact := compactKana(b, j-1)
 		first, second := fullSizeKana(t.sound)
+		kuGemination := startsKuGemination(b, j-1)
 		for i := range a {
 			diag := prev[i] + w.substitution(a, b, i, j) + script
 			if omitHead && j == 0 && i == 1 && a[i].sound == t.sound {
@@ -462,6 +473,9 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			if i > 0 && a[i].sound == second && a[i-1].sound == first {
 				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.KanaSize+script)
 			}
+			if kuGemination && i >= 2 && a[i-1].sound == "ku" && a[i].sound == t.sound && a[i-2].sound == b[j-2].sound {
+				curr[i+1] = math.Min(curr[i+1], older[i-1]+w.KuGemination+previousScript+script)
+			}
 			low = math.Min(low, curr[i+1])
 		}
 		if canDropTail && (!prefix || !tailAfterMarker(b, j+1, a[last].sound)) {
@@ -472,8 +486,12 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 		previousScript = script
 		if prefix {
 			// A two-mora edit can still skip this row to finish at the next one.
-			if low > limit && (w.KanaSize > limit || compactKana(b, j) == "") {
-				break
+			if low > limit {
+				canFinishKanaPair := w.KanaSize <= limit && compactKana(b, j) != ""
+				canFinishKuPair := w.KuGemination <= limit && startsKuGemination(b, j)
+				if !canFinishKanaPair && !canFinishKuPair {
+					break
+				}
 			}
 			if countsTowardLength(t) {
 				observedLength++
