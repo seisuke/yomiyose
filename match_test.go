@@ -48,6 +48,9 @@ func TestRuleSetDistances(t *testing.T) {
 		{"ウィリアムモリス", "ウイリアムモリス", .25, 4, .25},
 		{"リーエディー", "リーエディ", .125, 1.25, .125},
 		{"レジェップタイイップエルドアン", "レジェップタイイップエルドワン", .5, 2, .5},
+		{"エルモア・ジェイムズ", "エルモはジェームズ", .625, 2, .625},
+		{"オトワユウスケ", "オトはユウスケ", .125, .125, .125},
+		{"オトハユウスケ", "オトワユウスケ", 2, 2, 2},
 		{"オオノデビット", "オノデービット", .5, 2.25, 1.5},
 		{"キクチユウスケ", "キチユウスケ", 2, 2, 2},
 	} {
@@ -230,6 +233,45 @@ func TestGlideAfterOU(t *testing.T) {
 	w.GlideAfterOU = -1
 	if _, err := NewReadings(nil, w); err == nil {
 		t.Error("accepted a negative glide cost")
+	}
+}
+
+func TestObservedHaAsWa(t *testing.T) {
+	const name = "エルモア・ジェイムズ"
+	const text = "担当はエルモはジェームズさんです。"
+	w := DefaultWeights()
+	m := mustNew(t, w, Name{Text: name})
+	for _, tc := range []struct {
+		ref, obs string
+		want     float64
+	}{
+		{name, "エルモワジェームズ", .25},
+		{name, "エルモはジェームズ", .375},
+		{"エルモワジェイムズ", "エルモはジェームズ", .125},
+		{name, "エルモハジェームズ", 2},
+		{name, "エルモhaジェームズ", 2},
+		{"エルモはジェームズ", name, 2},
+		{"ヨシダアヤ", "ヨシダはヤ", 2},
+		{name, "エルモはシェームズ", 2.25},
+	} {
+		if got := m.Distance(tc.ref, tc.obs); got != tc.want {
+			t.Errorf("Distance(%q, %q) = %g, want %g", tc.ref, tc.obs, got, tc.want)
+		}
+	}
+	if got := m.Mask(text, .5, "■"); got != "担当は■さんです。" {
+		t.Errorf("at threshold: %q", got)
+	}
+	if got := m.Mask(text, .499, "■"); got != text {
+		t.Errorf("below threshold: %q", got)
+	}
+	w.HaAsWa = math.Inf(1)
+	m = mustNew(t, w)
+	if got := m.Distance(name, "エルモはジェームズ"); got != w.Other {
+		t.Errorf("disabled HaAsWa: %g", got)
+	}
+	w.HaAsWa = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative HaAsWa cost")
 	}
 }
 

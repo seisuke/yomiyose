@@ -3,6 +3,7 @@ package yomiyose
 import (
 	"bytes"
 	"encoding/csv"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -66,9 +67,9 @@ func readCorpus(t *testing.T, path string, fields int) [][]string {
 func TestFLEURSNameMasks(t *testing.T) {
 	rows := readCorpus(t, "testdata/fleurs_names.tsv", 7)
 	base := DefaultWeights()
-	length, glide := base, base
+	length, noGlide := base, base
 	length.LongInsertion = 1.5
-	glide.GlideAfterOU = 0.5
+	noGlide.GlideAfterOU = math.Inf(1)
 	for _, tc := range []struct {
 		label   string
 		column  int
@@ -76,7 +77,7 @@ func TestFLEURSNameMasks(t *testing.T) {
 		rules   RuleSet
 	}{
 		{"default_mask", 4, base, AllRules}, {"long_mask", 5, length, AllRules},
-		{"glide_mask", 6, glide, AllRules}, {"foreign_rules", 4, base, ForeignRules},
+		{"no_glide_mask", 6, noGlide, AllRules}, {"foreign_rules", 4, base, ForeignRules},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			const prefix, suffix = "記録は「", "」です。"

@@ -24,6 +24,7 @@ type Weights struct {
 	RepeatedVowelPenalty float64 // extra length-change cost in a run of three consonant-led moras with the same vowel
 	VowelLoss            float64 // ai vs a
 	GlideAfterOU         float64 // medial ア/ワ after a matching o/u mora and before a matching sound
+	HaAsWa               float64 // cost to read an observed hiragana は as ワ in the same context
 	Geminate             float64 // contextual presence/absence of ッ
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
@@ -45,8 +46,8 @@ func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25,
 		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
-		GlideAfterOU: math.Inf(1),
-		BV:           0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
+		GlideAfterOU: 0.25, HaAsWa: 0.125,
+		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
 	}
 }
@@ -135,7 +136,7 @@ func New(names []Name, w Weights) (*Matcher, error) {
 // set is AllRules. The matcher never guesses a rule set from the spelling.
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
-		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.Geminate,
+		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
 		w.BV, w.ShiShu, w.RiRu, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
@@ -324,12 +325,22 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 			cost = math.Min(cost, w.ShiShu+w.MedialVoicing)
 		}
 	}
-	if (x == "a" && y == "wa" || x == "wa" && y == "a") &&
-		i > 0 && j > 0 && i+1 < len(a) && j+1 < len(b) &&
+	var glide float64
+	switch {
+	case x == "a" && y == "wa" || x == "wa" && y == "a":
+		glide = w.GlideAfterOU
+	case x == "wa" && y == "ha" && b[j].hira:
+		glide = w.HaAsWa
+	case x == "a" && y == "ha" && b[j].hira:
+		glide = w.GlideAfterOU + w.HaAsWa
+	default:
+		return cost
+	}
+	if i > 0 && j > 0 && i+1 < len(a) && j+1 < len(b) &&
 		a[i-1].sound == b[j-1].sound && a[i+1].sound == b[j+1].sound && phonetic(a[i+1].sound) {
 		v := vowel(a[i-1].sound)
 		if v == 'o' || v == 'u' {
-			cost = math.Min(cost, w.GlideAfterOU)
+			cost = math.Min(cost, glide)
 		}
 	}
 	return cost
