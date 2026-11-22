@@ -1,5 +1,6 @@
-// Package yomiyose finds Japanese personal names in transcripts and returns
-// byte ranges in the original text. A Matcher can be reused concurrently.
+// Package yomiyose finds and masks known names in Japanese speech-to-text transcripts.
+// It matches registered readings by weighted phonetic edit distance and returns
+// byte ranges in the original UTF-8 text. A Matcher can be reused concurrently.
 package yomiyose
 
 import (

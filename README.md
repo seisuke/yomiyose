@@ -1,6 +1,12 @@
 # yomiyose
 
-日本人名・外国人名の読みを文字起こしの中から探し、元の文章でマスクできる範囲を返す Go ライブラリです。Go 1.22 以降、外部依存はありません。
+yomiyose は、日本語の音声認識（STT）の文字起こしから、あらかじめ読みを登録した人名を探してマスクする Go ライブラリです。長音・促音の表記揺れや聞き違いを重み付き編集距離で照合します。`Find` は指定した閾値以下の箇所を原文の UTF-8 バイト範囲で返し、`Mask` はその範囲をまとめて置き換えます。
+
+Go 1.22 以降で使えます。外部パッケージへの依存はありません。
+
+```sh
+go get github.com/seisuke/yomiyose@v0.1.0
+```
 
 ```go
 package main
@@ -127,3 +133,7 @@ fmt.Println(m.Mask(text, 0.25, "■")) // 受付に■さん、■さんがい�
 - 長音の仮名遣いと、ヴィ／ビなどの外来音の対応。[文化庁「現代仮名遣い」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gendaikana/honbun_dai1.html)・[「外来語の表記」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)
 - 日本人の姓のかな表記を分析した近似照合の先行研究。[高橋・梅村「人名のかな表記のゆれに基づく近似文字列照合法」](https://cir.nii.ac.jp/crid/1050564287841082880)
 - 同一人物の日本語表記を確認できる典拠。[Antonio Vivaldi](https://id.ndl.go.jp/auth/ndlna/00527045)・[David McKee](https://id.ndl.go.jp/auth/ndlna/00449504)
+
+## ライセンス
+
+yomiyose のコードは [MIT License](LICENSE) で利用できます。外部資料から採ったテストデータの出典、抜粋方法、利用条件は [DATA_SOURCES.md](DATA_SOURCES.md) に記載しています。
