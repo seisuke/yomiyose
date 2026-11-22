@@ -61,6 +61,32 @@ func TestLongVowelContext(t *testing.T) {
 	}
 }
 
+func TestGlideAfterOU(t *testing.T) {
+	w := DefaultWeights()
+	w.GlideAfterOU = .5
+	m := mustNew(t, w)
+	for _, tc := range []struct {
+		a, b string
+		want float64
+	}{
+		{"レセップタイップエルドアン", "レセップタイップエルドワン", .5},
+		{"トゥプアタマセーゼレアロフィ", "トゥプワタマセーゼレアロフィ", .5},
+		{"ヨシダアヤ", "ヨシダワヤ", 2},                 // The preceding vowel is a.
+		{"レセップタイップエルドアン", "レセップタイップエルドワル", 4}, // The following sounds differ.
+	} {
+		if got := m.Distance(tc.a, tc.b); got != tc.want {
+			t.Errorf("%s -> %s: got %g, want %g", tc.a, tc.b, got, tc.want)
+		}
+	}
+	if got := m.Distance("トゥプワタマセーゼレアロフィ", "トゥプアタマセーゼレアロフィ"); got != .5 {
+		t.Errorf("inverse glide: %g", got)
+	}
+	w.GlideAfterOU = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative glide cost")
+	}
+}
+
 func TestLongVowelContextInTranscript(t *testing.T) {
 	m, err := NewReadings([]string{"タナカミホ", "デビットマッキー"}, DefaultWeights())
 	if err != nil {

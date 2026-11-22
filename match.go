@@ -22,6 +22,7 @@ type Weights struct {
 	LongDeletion         float64 // other registered long vowels shortened in the observation
 	RepeatedVowelPenalty float64 // extra length-change cost in a run of three consonant-led moras with the same vowel
 	VowelLoss            float64 // ai vs a
+	GlideAfterOU         float64 // medial ア/ワ after a matching o/u mora and before a matching sound
 	Geminate             float64 // contextual presence/absence of ッ
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
@@ -41,7 +42,8 @@ func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25,
 		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, VowelLoss: 0.25, Geminate: 0.25,
-		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
+		GlideAfterOU: math.Inf(1),
+		BV:           0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
 	}
 }
@@ -85,7 +87,7 @@ func NewReadings(readings []string, w Weights) (*Matcher, error) {
 // New compiles the name list. Weights are copied and the input slices can be reused.
 func New(names []Name, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
-		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.Geminate,
+		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.Geminate,
 		w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
@@ -252,6 +254,14 @@ func (w Weights) substitution(a, b []unit, i, j int) float64 {
 	}
 	if i > 0 && j > 0 && voicingPartner[x] == y {
 		cost = math.Min(cost, w.MedialVoicing)
+	}
+	if (x == "a" && y == "wa" || x == "wa" && y == "a") &&
+		i > 0 && j > 0 && i+1 < len(a) && j+1 < len(b) &&
+		a[i-1].sound == b[j-1].sound && a[i+1].sound == b[j+1].sound && phonetic(a[i+1].sound) {
+		v := vowel(a[i-1].sound)
+		if v == 'o' || v == 'u' {
+			cost = math.Min(cost, w.GlideAfterOU)
+		}
 	}
 	return cost
 }
