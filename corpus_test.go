@@ -118,8 +118,17 @@ func TestFLEURSNameMasks(t *testing.T) {
 }
 
 func TestKotobaKanaNameMasks(t *testing.T) {
+	checkKanaNameMasks(t, "testdata/kotoba_kana_names.tsv")
+}
+
+func TestKoreanASRNameMasks(t *testing.T) {
+	checkKanaNameMasks(t, "testdata/korean_asr_names.tsv")
+}
+
+func checkKanaNameMasks(t *testing.T, path string) {
+	t.Helper()
 	const prefix, suffix = "記録は「", "」です。"
-	rows := readCorpus(t, "testdata/kotoba_kana_names.tsv", 5)
+	rows := readCorpus(t, path, 5)
 	for _, row := range rows[1:] {
 		t.Run(row[0]+"/"+row[1], func(t *testing.T) {
 			m := mustNew(t, DefaultWeights(), Name{Text: row[2]})

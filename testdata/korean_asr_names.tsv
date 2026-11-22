@@ -1,0 +1,17 @@
+dataset	utterance	reference	observed	expected_mask
+reazonspeech_small	000/43f52d77d97c7.flac	チョ・ソンジェ	チェ・ソンジェ	■
+reazonspeech_small	000/621d207bed43c.flac	ハン・ハクチャ	ハン・ハクチャー	■ー
+reazonspeech_small	000/6da14a680ca8b.flac	パク・ジス	パクジス	■
+reazonspeech_small	000/982716330248f.flac	イ・ジェミョン	イジメン	=
+reazonspeech_small	000/98a19a1ee69e0.flac	アン・チャンリム	アン・チャンリム	■
+reazonspeech_small	000/da0f827669b75.flac	キム・キョンテ	キム・キョンテ	■
+reazonspeech_small	001/86c12039320c2.flac	ムン・ジェイン	ムンジェイン	■
+reazonspeech_small	001/9727f420914ed.flac	キム・ウンジョン	キム・ウンジョン	■
+reazonspeech_small	003/118a0b3126385.flac	ファン・ソヌ	ファンソン	■ン
+reazonspeech_small	004/72c8608b3df99.flac	ユン・ソンニョル	ユンソン・ヨル	■
+reazonspeech_small	005/e0cbe073e1736.flac	リ・ハナ	リハーナ	■
+reazonspeech_small	007/66789e44531e8.flac	チョン・ジヒ	チョンジヒ	■
+reazonspeech_small	008/227d7a4c95d67.flac	チャン・グンソク	ジャン・グーソク	=
+reazonspeech_small	009/cc31b75eee3f4.flac	イ・ジョンフ	イ・ジョンク	■ク
+reazonspeech_small	00a/84f1be1af6e69.flac	ユン・ソギョル	ユンソギョル	■
+reazonspeech_small	00b/6d5d6c9f00a4f.flac	ユン・ソンニョル	ユン・ソンニョル	■

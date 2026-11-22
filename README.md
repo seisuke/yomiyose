@@ -75,6 +75,7 @@ func main() {
 ## テストデータ・参考資料
 
 - [テストデータ](testdata/)
+- [日本人名のマスク例](EVALUATION.md#日本人名のマスク例)・[韓国人名のマスク例](EVALUATION.md#韓国人名のマスク例)
 - [マスク結果と評価の再現手順](EVALUATION.md)
 - [データの出典・利用条件・参考文献](DATA_SOURCES.md)
 

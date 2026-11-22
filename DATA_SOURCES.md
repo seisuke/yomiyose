@@ -6,7 +6,9 @@
 |---|---|---|
 | [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
 | [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人11人、21出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
-| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人10人、10発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
+| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
+| [korean_asr_names.tsv](testdata/korean_asr_names.tsv) | 韓国人14人、16発話 | 日本語放送の字幕と、同じ発話に対するWhisper large-v3の出力を照合。氏名の範囲を抜粋 |
+| [korean_name_spellings.tsv](testdata/korean_name_spellings.tsv) | 韓国人3人、4組のかな表記（参考資料） | 日本語の音楽・映画資料、報道に載った同一人物の表記を対にして記録 |
 | [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話（原表記の参考資料） | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与。公開STTのかな氏名のマスク性能集計からは全7件を除外 |
 
 ## テストデータの利用条件
@@ -15,6 +17,7 @@ Goモジュールのソース配布物には上記のTSVが含まれる。TSVを
 
 - **FLEURS** — `fleurs_names.tsv` は Google の正解文と yukobayashi500 の評価結果から人名部分を抜き出し、マスク期待値を加えた。両配布元の CC BY 4.0 は商用利用も認めている。抜粋を再配布する際は、出典・ライセンス・変更内容の表示を引き継ぐ。[Google FLEURS](https://huggingface.co/datasets/google/fleurs)・[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - **Kotoba Technologies の評価結果** — JSUT、Common Voice 8、ReazonSpeech の各発話でどんな表記が観測されたかを、IDと人名部分の短い表記対で記録した。確認したコミットには評価CSV全体の商用再配布を明示するライセンスは見当たらない。文化庁は単なる事実・データやアイデアを参照して利用できると説明している。[参照した版](https://github.com/kotoba-tech/kotoba-whisper/tree/649fe3d1427d9ad6027940e29e7651fd516ea590)・[文化庁の説明](https://www.bunka.go.jp/seisaku/chosakuken/seidokaisetsu/chosakukensha_fumei/)
+- **Japanese ASR の放送文字起こし** — `korean_asr_names.tsv` に収録したのは発話ID、字幕とモデル出力に現れた氏名、テストで期待する置換結果。公開元のデータカードには再配布ライセンスの記載がない。元の放送文や音声は収録していない。[固定版のデータカード](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small/blob/c74b52fc164cf7b64936ca62aee4336eac626739/README.md)
 - **元の音声・台本** — JSUT は音声の営利利用について配布元への連絡を案内している。台本には出典別のライセンスがある。Mozilla は Common Voice の元データを CC0 と説明している。ReazonSpeech の配布元は日本語音声コーパスの用途を情報解析に限定している。これらは原資料を直接利用するときの条件である。[JSUTの利用条件](https://sites.google.com/site/shinnosuketakamichi/publication/jsut)・[JSUTの原著論文](https://arxiv.org/abs/1711.00354)・[Mozillaの解説](https://assets.mofoprod.net/network/documents/Creating-Community-Driven-Datasets-Report-032023-GIZ-Mozilla.pdf)・[ReazonSpeechの利用条件](https://research.reazon.jp/projects/ReazonSpeech/index.html)
 
 ## 日本人名の発話別STT出力
@@ -59,7 +62,29 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 
 ### Kotoba Technologies の評価結果
 
-JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpeech test から5発話を選んだ。上記の固定コミットの各CSVで、`reference_raw` と `prediction_raw` に含まれる人物名の範囲を目視で対応付けた。`dataset` と `utterance` で元の行を特定できる。表記が一致する対照例、中黒の違い、ひらがなの混入や音の置換を含め、読みは補っていない。`expected_mask` の `=` は出力に名前がそのまま残ることを表す。
+JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpeech test から6発話を選んだ。上記の固定コミットの各CSVで、`reference_raw` と `prediction_raw` に含まれる人物名の範囲を目視で対応付けた。`dataset` と `utterance` で元の行を特定できる。表記が一致する対照例、中黒の違い、ひらがなの混入や音の置換を含め、読みは補っていない。`expected_mask` の `=` は出力に名前がそのまま残ることを表す。
+
+### 韓国人名のかな表記
+
+ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Whisper large-v3 で「キム・シュウ」になった。`81d3b99d7b38f.flac` の「アン・チャンイル」は正解と出力の両方に同じ表記があり、一致する対照例に選んだ。[Kotobaの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
+
+別の16発話は Japanese ASR が公開した ReazonSpeech `small` の学習用分割から採った。15個のParquetに含まれる62,047発話の `transcription` から、「キム」「パク」などの姓に中黒・空白と名が続く箇所や、今回調べた表記を抽出した。候補の前後を読み、人物を確認でき、字幕と出力の双方でかなの氏名部分を特定できる発話を選んだ。判定にはマスクの成否を使っていない。[データセットとモデル説明](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small)・[参照したParquetの固定版](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small/tree/c74b52fc164cf7b64936ca62aee4336eac626739/small)
+
+元データの `name` がTSVの `utterance` に対応する。同じ行の `whisper_transcript` をWhisperの多言語語彙で復号し、特殊トークンを除いた文字列から `observed` を抜き出した。中黒の位置や長音は出力のまま保存した。尹氏の3発話には「ユン・ソンニョル → ユンソン・ヨル」「ユン・ソギョル → ユンソギョル」「ユン・ソンニョル → ユン・ソンニョル」がある。これらは「ソンニョル」が「ソギョル」に置き換わった発話には該当しない。[発話IDと表記対](testdata/korean_asr_names.tsv)
+
+#### 出版・報道で使われた異表記（参考）
+
+`korean_name_spellings.tsv` の2つの表記列は、いずれも出版・報道資料から採ったもの。パク監督と尹氏の計5表記は、上記Kotobaの3つのCSVとFLEURSの計21,896行で、正解文・認識結果の双方を検索した。全半角・ひらがな・中黒・空白をそろえても、該当するかなのフルネームは0件だった。両氏について、この標本からSTTの聞き違いの頻度は推定できない。
+
+| TSVの人物ID | 表記対を確認した資料 |
+|---|---|
+| cho-yong-pil | 日本盤のクレジットは「チョー・ヨンピル」。辞書には「チョ・ヨンピル」もある。[発売元の作品情報](https://www.universal-music.co.jp/cho-yongpil/products/umck-9646/)・[Kpediaの見出しと読み](https://www.kpedia.jp/w.asp?isnop=1&p1=26655) |
+| park-chan-wook | 映画公式サイトは「パク・チャヌク」。同じ監督を「パク・チャンウク」とも書く日本語記事がある。後者は媒体がAI翻訳と明記している。[映画公式サイト](https://nootherchoice.jp/)・[STARNEWSの日本語記事](https://www.starnewskorea.com/ja/movie/2026/02/26/2026022613551361992) |
+| yoon-seok-youl | 読売テレビのアナウンサーが放送・新聞の表記変更を記録した。同一人物の「ユン・ソンニョル」「ユン・ソギョル」「ユン・ソクヨル」から2組を採った。[読売テレビ「尹錫悦の読み方2」](https://www.ytv.co.jp/michiura_time/contents/202205/kn1ay366wu26n3pw.html) |
+
+「チャヌク／チャンウク」は、찬욱 の 찬 の末尾の子音 /n/ を次の 욱 の母音 /u/ につなげて書くか、音節を区切って書くかで説明できる。福岡大学の映画資料でも、同じ連音を「ハン・ウジン／ハヌジン」で説明している。[福岡大学の調査資料](https://fukuoka-u.repo.nii.ac.jp/record/2838/files/A0905_0133.pdf)
+
+「ソギョル／ソンニョル」には韓国語でも発音の違いがある。国立国語院は 윤석열 について、一般的な発音規則に沿う読みを [윤서결]、慣用による読みを [윤성녈] としている。「ソクヨル」は日本の新聞が 석・열 に個別に読みを当てた表記で、読売テレビは新聞・放送各社が表記を変更した経緯を記録している。[韓国・国立国語院の回答](https://korean.go.kr/front/onlineQna/onlineQnaView.do?mn_id=98&pageIndex=1&qna_seq=326592)・[読売テレビの記録](https://www.ytv.co.jp/michiura_time/contents/202205/kn1ay366wu26n3pw.html)
 
 ### FLEURS 日本語
 
