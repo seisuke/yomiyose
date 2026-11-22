@@ -1,4 +1,4 @@
-utterance	model	reference	hypothesis	default_mask	long_mask	no_glide_mask	foreign_by_length_mask
+utterance	model	reference	hypothesis	max_1_5_mask	long_mask	no_glide_mask	default_mask
 fleurs-0075	openai/whisper-large-v3-turbo	ラホール・ドラヴィッド	ラホール・ドラビット	■	■	■	■
 fleurs-0160	openai/whisper-large-v3-turbo	アーノルド・シュワルツェネッガー	アーノルド・シュワルツネッカー	■	■	■	■
 fleurs-0332	openai/whisper-large-v3	トゥプア・タマセーゼ・レアロフィ	トゥプワ・タマセイゼ・レアロフィー	■ー	■ー	■ー	■ー
@@ -16,7 +16,7 @@ fleurs-0552	FunAudioLLM/SenseVoiceSmall	グレン・クッシング	グレーン
 fleurs-0380	litagin/anime-whisper	ジェームズ・パジェット	ジェムス・パシェット	■	■	■	■
 fleurs-0332	reazon-research/japanese-wav2vec2-large-rs35kh	トゥプア・タマセーゼ・レアロフィ	トゥプアタマセゼレアロフィー	■ー	■ー	■ー	■ー
 fleurs-0453	openai/whisper-medium	リー・シェン・ルーン	ディー・シェン・ルーン	■	■	■	■
-fleurs-0333	openai/whisper-large-v3-turbo	トゥプア・タマセーゼ・レアロフィ	トワッパー・タマセ・ゼ・デアロフィ	=	=	=	■
+fleurs-0333	openai/whisper-large-v3-turbo	トゥプア・タマセーゼ・レアロフィ	トワッパー・タマセ・ゼ・デアロフィ	=	■	■	■
 fleurs-0453	litagin/anime-whisper	リー・シェン・ルーン	ディ・シェン・ルーン	■	■	■	■
 fleurs-0162	openai/whisper-large-v3-turbo	アーノルド・シュワルツェネッガー	アーノルド・シュワレツネッカー	=	=	=	=
 fleurs-0603	litagin/anime-whisper	ジャンカルロ・フィジケラ	ジャン・カルロ・フィジェキャラ	=	=	=	=

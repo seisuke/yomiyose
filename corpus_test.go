@@ -67,20 +67,19 @@ func readCorpus(t *testing.T, path string, fields int) [][]string {
 func TestFLEURSNameMasks(t *testing.T) {
 	rows := readCorpus(t, "testdata/fleurs_names.tsv", 8)
 	base := DefaultWeights()
-	length, noGlide, byLength := base, base, base
+	length, noGlide := base, base
 	length.LongInsertion = 1.5
 	noGlide.GlideAfterOU = math.Inf(1)
-	byLength.LimitByMoraCount = true
 	for _, tc := range []struct {
-		label   string
-		column  int
-		weights Weights
-		rules   RuleSet
-		limit   float64
+		label    string
+		column   int
+		weights  Weights
+		rules    RuleSet
+		capAt1_5 bool
 	}{
-		{"default_mask", 4, base, AllRules, 1.5}, {"long_mask", 5, length, AllRules, 1.5},
-		{"no_glide_mask", 6, noGlide, AllRules, 1.5}, {"foreign_rules", 4, base, ForeignRules, 1.5},
-		{"default_by_length", 7, byLength, AllRules, 2}, {"foreign_by_length", 7, byLength, ForeignRules, 2},
+		{"default_mask", 7, base, AllRules, false}, {"long_mask", 5, length, AllRules, false},
+		{"no_glide_mask", 6, noGlide, AllRules, false}, {"foreign_rules", 7, base, ForeignRules, false},
+		{"max_1_5_mask", 4, base, AllRules, true},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			const prefix, suffix = "記録は「", "」です。"
@@ -91,7 +90,12 @@ func TestFLEURSNameMasks(t *testing.T) {
 					t.Fatal(err)
 				}
 				input := prefix + row[3] + suffix
-				got := m.Mask(input, tc.limit, "■")
+				var got string
+				if tc.capAt1_5 {
+					got = m.Mask(input, 1.5, "■")
+				} else {
+					got = m.MaskDefault(input, "■")
+				}
 				want := row[tc.column]
 				if want == "=" {
 					want = row[3]
@@ -123,7 +127,7 @@ func TestKotobaKanaNameMasks(t *testing.T) {
 			if want == "=" {
 				want = row[3]
 			}
-			if got := m.Mask(prefix+row[3]+suffix, 1.5, "■"); got != prefix+want+suffix {
+			if got := m.MaskDefault(prefix+row[3]+suffix, "■"); got != prefix+want+suffix {
 				t.Errorf("registered %q, observed %q: got %q, want %q", row[2], row[3], got, prefix+want+suffix)
 			}
 		})
@@ -142,7 +146,7 @@ func TestJapaneseASRReadingExamples(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				got := m.Mask("記録は「"+row[5]+"」です。", 1.5, "■")
+				got := m.MaskDefault("記録は「"+row[5]+"」です。", "■")
 				if want := "記録は「" + row[6] + "」です。"; got != want {
 					t.Errorf("rules %d: %s -> %s: got %q, want %q", scope, row[4], row[5], got, want)
 				}
@@ -154,16 +158,17 @@ func TestJapaneseASRReadingExamples(t *testing.T) {
 func checkTranscriptCorpus(t *testing.T, w Weights, overrides map[string]string) {
 	t.Helper()
 	rows := readCorpus(t, "testdata/transcripts.tsv", 4)
-	var full, partial, missed, allowed, extra int
+	var texts, full, partial, missed, allowed, extra int
 	for _, row := range rows[1:] {
 		t.Run(row[0], func(t *testing.T) {
+			texts++
 			text, targets := annotatedText(t, row[2])
 			m, err := NewReadings(strings.Split(row[1], "|"), w)
 			if err != nil {
 				t.Fatal(err)
 			}
 			hidden := make([]bool, len(text))
-			for _, h := range m.Find(text, 1.5) {
+			for _, h := range m.FindDefault(text) {
 				if h.Start < 0 || h.End > len(text) || h.Start >= h.End ||
 					!utf8.RuneStart(text[h.Start]) || (h.End < len(text) && !utf8.RuneStart(text[h.End])) {
 					t.Fatalf("invalid UTF-8 span %+v", h)
@@ -222,11 +227,11 @@ func checkTranscriptCorpus(t *testing.T, w Weights, overrides map[string]string)
 			if override, ok := overrides[row[0]]; ok {
 				want = override
 			}
-			if got := m.Mask(text, 1.5, "■"); got != want {
+			if got := m.MaskDefault(text, "■"); got != want {
 				t.Errorf("mask = %q, want %q", got, want)
 			}
 		})
 	}
 	t.Logf("texts=%d mentions=%d full=%d partial=%d exposed=%d allowed_hits=%d extra_hits=%d",
-		len(rows)-1, full+partial+missed, full, partial, missed, allowed, extra)
+		texts, full+partial+missed, full, partial, missed, allowed, extra)
 }

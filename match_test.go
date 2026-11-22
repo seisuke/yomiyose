@@ -183,13 +183,12 @@ func TestDefaultMoraEdits(t *testing.T) {
 }
 
 func TestMoraCountLimits(t *testing.T) {
-	for n, want := range map[int]float64{6: 1.5, 7: 1.75, 8: 1.75, 9: 1.75, 10: 2, 20: 2} {
-		if got := moraCostLimit(n); got != want {
+	w := DefaultWeights()
+	for n, want := range map[int]float64{3: 1.5, 6: 1.5, 7: 1.75, 8: 1.75, 9: 1.75, 10: 2, 20: 2} {
+		if got := w.MoraLimits.costLimit(n); got != want {
 			t.Errorf("limit at %d moras = %g, want %g", n, got, want)
 		}
 	}
-	w := DefaultWeights()
-	w.LimitByMoraCount = true
 	for _, tc := range []struct {
 		name, observed string
 		limit          float64
@@ -209,6 +208,33 @@ func TestMoraCountLimits(t *testing.T) {
 		if got := m.Mask(text, tc.limit, "■"); got != want {
 			t.Errorf("Mask(%q, %g) = %q, want %q", text, tc.limit, got, want)
 		}
+	}
+}
+
+func TestCustomMoraLimits(t *testing.T) {
+	w := DefaultWeights()
+	w.MoraLimits = &MoraLimits{UpTo6: 0, From7To9: 2, From10: 2.25}
+	m := mustNew(t, w, Name{Text: "サトウレナ"}, Name{Text: "ジャンカルロ・フィジケラ"}, Name{Text: "アーノルド・シュワルツェネッガー"})
+	w.MoraLimits.From10 = 0 // A later change must not affect the compiled matcher.
+	const input = "サトウレーナ。ジャン・カルロ・フィジェキャラ。アーノルド・シュワレツネッカー。"
+	if got := m.MaskDefault(input, "■"); got != "サトウレーナ。■。■。" {
+		t.Fatalf("configured length limits: %q", got)
+	}
+	// A ten-mora reference can match a nine-mora observation even when the
+	// caller sets a stricter limit for ten moras than for nine.
+	m = mustNew(t, w, Name{Text: "アレクサンドル・ペトロ"})
+	if got := m.MaskDefault("アレクンドルモトロ", "■"); got != "■" {
+		t.Errorf("shorter observed length: %q", got)
+	}
+	w.MoraLimits = nil
+	m = mustNew(t, w, Name{Text: "ジャンカルロ・フィジケラ"})
+	const observed = "ジャン・カルロ・フィジェキャラ"
+	if got := m.MaskDefault(observed, "■"); got != observed {
+		t.Errorf("missing settings should use the default nine-mora limit: %q", got)
+	}
+	w.LimitByMoraCount = false
+	if got := mustNew(t, w, Name{Text: "ジャンカルロ・フィジケラ"}).Mask(observed, 2, "■"); got != "■" {
+		t.Errorf("explicitly disabled length limits: %q", got)
 	}
 }
 
@@ -250,7 +276,7 @@ func TestKuGeminationMask(t *testing.T) {
 		if len(hits) != 1 || hits[0].Cost != tc.cost || text[hits[0].Start:hits[0].End] != tc.observed {
 			t.Errorf("Find(%q): %+v", text, hits)
 		}
-		if m.Mask(text, 1.5, "■") != "受付は「■」です。" || m.Mask(text, tc.cost-.01, "■") != text {
+		if m.MaskDefault(text, "■") != "受付は「■」です。" || m.Mask(text, tc.cost-.01, "■") != text {
 			t.Errorf("unexpected mask or threshold for %q", text)
 		}
 	}
@@ -554,7 +580,7 @@ func TestMaskTranscript(t *testing.T) {
 	input := prefix + "🙂イシイ・カオリさんが来て、イシイカオさんが帰った。いしいかおりさん。"
 	want := []string{"イシイ・カオリ", "イシイカオ", "いしいかおり"}
 	cost := []float64{0, .75, .75}
-	hits := m.Find(input, 1.5)
+	hits := m.FindDefault(input)
 	if len(hits) != len(want) {
 		t.Fatalf("hits = %+v", hits)
 	}
@@ -563,7 +589,7 @@ func TestMaskTranscript(t *testing.T) {
 			t.Errorf("got %+v (%s)", h, input[h.Start:h.End])
 		}
 	}
-	if got := m.Mask(input, 1.5, "＊＊"); got != prefix+"🙂＊＊さんが来て、＊＊さんが帰った。＊＊さん。" {
+	if got := m.MaskDefault(input, "＊＊"); got != prefix+"🙂＊＊さんが来て、＊＊さんが帰った。＊＊さん。" {
 		t.Error("incorrect mask")
 	}
 }
@@ -724,6 +750,7 @@ func TestLengthSettings(t *testing.T) {
 	for _, cap := range []float64{1, 1.75, 2, math.Inf(1)} {
 		w := DefaultWeights()
 		w.TwoMoraMaxCost = cap
+		w.MoraLimits.UpTo6 = math.Inf(1) // isolate the two-mora cap
 		m := mustNew(t, w, Name{Text: "オノアキ"})
 		for _, sample := range []struct {
 			text string
@@ -743,11 +770,13 @@ func TestLengthSettings(t *testing.T) {
 	if got := m.Mask("さとうアヤ", 1, "X"); got != "X" {
 		t.Fatalf("two-mora limit prematurely stopped a longer alignment: %q", got)
 	}
-	for _, field := range []*float64{&w.TwoMoraMaxCost, &w.LongInsertion, &w.LongDeletion} {
+	for _, field := range []*float64{&w.TwoMoraMaxCost, &w.LongInsertion, &w.LongDeletion, &w.MoraLimits.UpTo6, &w.MoraLimits.From7To9, &w.MoraLimits.From10} {
 		saved := *field
-		*field = -1
-		if _, err := New(nil, w); err == nil {
-			t.Error("accepted a negative length setting")
+		for _, invalid := range []float64{-1, math.NaN()} {
+			*field = invalid
+			if _, err := New(nil, w); err == nil {
+				t.Errorf("accepted invalid length setting %g", invalid)
+			}
 		}
 		*field = saved
 	}

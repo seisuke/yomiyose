@@ -55,7 +55,6 @@ func TestTupuaFullNameMask(t *testing.T) {
 	const name = "トゥプア・タマセーゼ・レアロフィ"
 	const observed = "トワッパー・タマセ・ゼ・デアロフィ"
 	w := DefaultWeights()
-	w.LimitByMoraCount = true
 	m, err := NewReadings([]string{name}, w)
 	if err != nil {
 		t.Fatal(err)
@@ -67,10 +66,10 @@ func TestTupuaFullNameMask(t *testing.T) {
 		t.Errorf("all-rules distance = %g", got)
 	}
 	const text = "受付は「" + observed + "」です。"
-	if hits := m.Find(text, 2); len(hits) != 1 || hits[0].Name != name || hits[0].Cost != 2 || text[hits[0].Start:hits[0].End] != observed {
+	if hits := m.FindDefault(text); len(hits) != 1 || hits[0].Name != name || hits[0].Cost != 2 || text[hits[0].Start:hits[0].End] != observed {
 		t.Errorf("full name span at 2: %+v", hits)
 	}
-	if got := m.Mask(text, 2, "■"); got != "受付は「■」です。" {
+	if got := m.MaskDefault(text, "■"); got != "受付は「■」です。" {
 		t.Errorf("mask at 2: %q", got)
 	}
 	if got := m.Mask(text, math.Nextafter(2, 0), "■"); got != text {
@@ -111,12 +110,12 @@ func TestShortenedTupuaTranscript(t *testing.T) {
 	} {
 		const prefix, suffix = "先ほど、", "さんが受付に来ました。"
 		text := prefix + tc.observed + suffix
-		hits := m.Find(text, 1.5)
+		hits := m.FindDefault(text)
 		if len(hits) != 1 || hits[0].Name != name || hits[0].Cost != tc.cost ||
 			hits[0].Start != len(prefix) || hits[0].End != len(prefix)+len(tc.observed) {
 			t.Errorf("Find(%q) = %+v", text, hits)
 		}
-		if got := m.Mask(text, 1.5, "［氏名］"); got != prefix+"［氏名］"+suffix {
+		if got := m.MaskDefault(text, "［氏名］"); got != prefix+"［氏名］"+suffix {
 			t.Errorf("Mask(%q) = %q", text, got)
 		}
 	}

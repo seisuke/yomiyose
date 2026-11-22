@@ -46,7 +46,21 @@ type Weights struct {
 	Hiragana             float64 // per observed mora originally written in hiragana
 	TwoMoraMaxCost       float64 // Find/Mask ceiling for two moras; +Inf uses the caller's limit
 	ExactSingleMora      bool    // require identical normalized sounds for a one-mora candidate
-	LimitByMoraCount     bool    // extra Find/Mask ceilings: 1.5 through 6 moras, 1.75 through 9, then 2
+	LimitByMoraCount     bool    // apply MoraLimits to Find/Mask; enabled by DefaultWeights
+
+	MoraLimits *MoraLimits // nil uses the default length bands; copied when creating a matcher
+}
+
+// MoraLimits sets search costs by the shorter of the registered and matched readings.
+// The one- and two-mora restrictions in Weights also apply.
+type MoraLimits struct {
+	UpTo6    float64
+	From7To9 float64
+	From10   float64
+}
+
+func (l MoraLimits) maximum() float64 {
+	return max(l.UpTo6, l.From7To9, l.From10)
 }
 
 // DefaultWeights returns initial ranking costs, not estimated probabilities.
@@ -58,6 +72,7 @@ func DefaultWeights() Weights {
 		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
+		LimitByMoraCount: true, MoraLimits: &MoraLimits{UpTo6: 1.5, From7To9: 1.75, From10: 2},
 	}
 }
 
@@ -159,7 +174,14 @@ func New(names []Name, w Weights) (*Matcher, error) {
 // NewScoped compiles a list with an explicit rule set per name. The zero rule
 // set is AllRules. The matcher never guesses a rule set from the spelling.
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
+	if w.MoraLimits == nil {
+		w.MoraLimits = DefaultWeights().MoraLimits
+	} else {
+		limits := *w.MoraLimits
+		w.MoraLimits = &limits // the compiled matcher owns its settings
+	}
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
+		w.MoraLimits.UpTo6, w.MoraLimits.From7To9, w.MoraLimits.From10,
 		w.TuToWa, w.PuaContraction, w.ForeignLongInsertion, w.ForeignLongDeletion,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
 		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
@@ -464,14 +486,14 @@ func countsTowardLength(t unit) bool {
 	return t.sound != " " && t.sound != "'" && t.sound != ""
 }
 
-func moraCostLimit(moras int) float64 {
+func (l MoraLimits) costLimit(moras int) float64 {
 	switch {
 	case moras <= 6:
-		return 1.5
+		return l.UpTo6
 	case moras <= 9:
-		return 1.75
+		return l.From7To9
 	default:
-		return 2
+		return l.From10
 	}
 }
 
@@ -584,7 +606,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 				continue
 			}
 			cost := prev[len(a)]
-			if w.LimitByMoraCount && cost > moraCostLimit(shorter) {
+			if w.LimitByMoraCount && cost > w.MoraLimits.costLimit(shorter) {
 				continue
 			}
 			if shorter == 2 && cost > w.TwoMoraMaxCost {
@@ -671,6 +693,15 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 	return sounds
 }
 
+// FindDefault uses the configured length limits. When LimitByMoraCount is off,
+// it uses the largest of the three limits for every length.
+func (m *Matcher) FindDefault(text string) []Match {
+	if len(m.names) == 0 {
+		return nil
+	}
+	return m.Find(text, m.rules[AllRules].MoraLimits.maximum())
+}
+
 // Find returns occurrences with cost <= maxCost, in source order. For each
 // name, better matches suppress overlapping worse matches. For each start/reading
 // the longest of its cheapest prefixes wins; equal-cost overlaps from other
@@ -678,6 +709,10 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 func (m *Matcher) Find(text string, maxCost float64) []Match {
 	if len(m.names) == 0 || maxCost < 0 || math.IsNaN(maxCost) {
 		return nil
+	}
+	if w := &m.rules[AllRules]; w.LimitByMoraCount {
+		// Even a long name can match a shorter candidate with a higher custom limit.
+		maxCost = min(maxCost, w.MoraLimits.maximum())
 	}
 	tokens := tokenize(text)
 	positions := make(map[string][]int)
@@ -694,15 +729,6 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 		for _, form := range name.forms {
 			w := m.rules[name.rules].forReading(form)
 			limit := maxCost
-			if w.LimitByMoraCount {
-				moras := 0
-				for _, t := range form {
-					if countsTowardLength(t) {
-						moras++
-					}
-				}
-				limit = min(limit, moraCostLimit(moras))
-			}
 			rows := make([]float64, 3*(len(form)+1))
 			omitHead := w.HeadLoss <= limit && canOmitHead(form)
 			check := func(i int) {
@@ -783,9 +809,17 @@ func mark(bytes []bool, hits []Match, value bool) {
 	}
 }
 
+// MaskDefault masks the occurrences returned by FindDefault.
+func (m *Matcher) MaskDefault(text, replacement string) string {
+	return maskMatches(text, replacement, m.FindDefault(text))
+}
+
 // Mask replaces every matched span, merging overlapping spans across names.
 func (m *Matcher) Mask(text string, maxCost float64, replacement string) string {
-	hits := m.Find(text, maxCost)
+	return maskMatches(text, replacement, m.Find(text, maxCost))
+}
+
+func maskMatches(text, replacement string, hits []Match) string {
 	if len(hits) == 0 {
 		return text
 	}

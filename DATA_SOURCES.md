@@ -83,7 +83,7 @@ JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpe
 | ラインダンス → ラインランス | ReazonSpeech `d027cb91bb410.flac`、Whisper large-v3 | 一般語のダ → ラ |
 | レスラー → レスター | fleurs-0529、anime-whisper | 一般語のラ → タ |
 
-`fleurs-0453` の anime-whisper 出力「ディ・シェン・ルーン」も、長音の落ちた語頭の回帰例として収録した。かなでフルネームが残る `fleurs-0162`（Whisper large-v3-turbo）と `fleurs-0603`（anime-whisper）も見落としを検証する行として収録した。TSV の `foreign_by_length_mask` は長さ別上限・指定閾値 `2` での期待マスク。この21件では標準設定と `ForeignRules` で同じ結果になり、両方を検証している。語中の「ロ」、末尾の「フィ」などを削った短縮例は別途Goテストで作成し、公開出力の件数から除外した。
+`fleurs-0453` の anime-whisper 出力「ディ・シェン・ルーン」も、長音の落ちた語頭の回帰例として収録した。かなでフルネームが残る `fleurs-0162`（Whisper large-v3-turbo）と `fleurs-0603`（anime-whisper）も見落としを検証する行として収録した。TSV の `default_mask` は既定の長さ別上限での期待マスク。`max_1_5_mask` は上限をさらに `1.5` に絞った場合の期待マスク。この21件では既定の長さ別上限で標準設定と `ForeignRules` が同じ結果になり、両方を検証している。語中の「ロ」、末尾の「フィ」などを削った短縮例は別途Goテストで作成し、公開出力の件数から除外した。
 
 フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者は語頭の照合、後者はラ行以外も変わる見落としの検証に使う。タ行については今回の抽出でタ行との置換だけで説明できるフルネームの例を確認できず、資料にとどめた。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
 
