@@ -174,3 +174,27 @@ func TestSearchDoesNotBorrowLongVowelContext(t *testing.T) {
 		t.Errorf("borrowed text outside match: %+v", h)
 	}
 }
+
+func TestDirectionalLengthCosts(t *testing.T) {
+	m := mustNew(t, DefaultWeights())
+	for _, tc := range []struct {
+		short, long  string
+		insert, drop float64
+	}{
+		{"ヨシダアヤ", "ヨーシダアヤ", 2, 1.25}, {"サカケイスケ", "サーカケイスケ", 2, 1.25},
+		{"フジタユスケ", "フジタユースケ", 2, 1.25}, {"ミズノレナ", "ミズノレーナ", 2, 1.25},
+		{"ミズノレナ", "ミズノレイナ", 2, 1.25}, {"サトウレナ", "サトウレーナ", 2, 1.25},
+		{"サトウデビット", "サトウデービット", .25, .25}, {"devi^tomakki:", "de:vi^tomakki:", .25, .25},
+		{"ニナフェドロフ", "ニーナフェドロフ", .25, .25}, {"ニコマリ", "ニコマリー", .125, .125},
+		{"セオドアトマス", "セオドアトーマス", .25, .25}, {"イトマキコ", "イトーマキコ", 2, 1.25},
+		{"ヤマモトヨハン", "ヤマモトヨーハン", .25, .25},
+		{"マリニコ", "マリーニコ", .25, .25}, {"タナカミホ", "タナーーカミホ", 4, 3.25},
+	} {
+		if got := m.Distance(tc.short, tc.long); got != tc.insert {
+			t.Errorf("%s -> %s: %g, want %g", tc.short, tc.long, got, tc.insert)
+		}
+		if got := m.Distance(tc.long, tc.short); got != tc.drop {
+			t.Errorf("%s -> %s: %g, want %g", tc.long, tc.short, got, tc.drop)
+		}
+	}
+}

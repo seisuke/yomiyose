@@ -12,25 +12,28 @@ import (
 // Weights assigns a nonnegative edit cost to each rule. Positive infinity
 // disables a rule. Start with DefaultWeights to override individual costs.
 type Weights struct {
-	LongSpelling  float64 // alternative ways of writing the same long vowel
-	EiSpelling    float64 // ei vs an e long vowel
-	OuSpelling    float64 // ou vs an o long vowel
-	LongLoss      float64 // medial length difference
-	FinalLongLoss float64 // final length difference
-	VowelLoss     float64 // ai vs a
-	Geminate      float64 // contextual presence/absence of ッ
-	BV            float64 // corresponding b/v moras
-	TiChi         float64 // ティ/チ
-	MedialVoicing float64 // voiced/unvoiced pairs after the first mora
-	InitialKS     float64 // same vowel with k/s in the first mora
-	TailLoss      float64 // one missing final ordinary mora of the reference
-	Other         float64 // other mora insertions, deletions and substitutions
-	Hiragana      float64 // per observed mora originally written in hiragana
+	LongSpelling         float64 // alternative ways of writing the same long vowel
+	EiSpelling           float64 // ei vs an e long vowel
+	OuSpelling           float64 // ou vs an o long vowel
+	LongLoss             float64 // medial length difference
+	FinalLongLoss        float64 // final length difference
+	LongInsertion        float64
+	LongDeletion         float64
+	RepeatedVowelPenalty float64
+	VowelLoss            float64 // ai vs a
+	Geminate             float64 // contextual presence/absence of ッ
+	BV                   float64 // corresponding b/v moras
+	TiChi                float64 // ティ/チ
+	MedialVoicing        float64 // voiced/unvoiced pairs after the first mora
+	InitialKS            float64 // same vowel with k/s in the first mora
+	TailLoss             float64 // one missing final ordinary mora of the reference
+	Other                float64 // other mora insertions, deletions and substitutions
+	Hiragana             float64 // per observed mora originally written in hiragana
 }
 
 // DefaultWeights returns initial ranking costs, not estimated probabilities.
 func DefaultWeights() Weights {
-	return Weights{LongSpelling: 0, LongLoss: 0.25, FinalLongLoss: 0.125, TiChi: 0.25, VowelLoss: 0.25, Geminate: 0.25,
+	return Weights{LongSpelling: 0, LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25, RepeatedVowelPenalty: 2, TiChi: 0.25, VowelLoss: 0.25, Geminate: 0.25,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, Other: 2, Hiragana: 0.125}
 }
 
@@ -72,7 +75,7 @@ func NewReadings(readings []string, w Weights) (*Matcher, error) {
 
 // New compiles the name list. Weights are copied and the input slices can be reused.
 func New(names []Name, w Weights) (*Matcher, error) {
-	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss, w.TiChi, w.VowelLoss, w.Geminate, w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.Other, w.Hiragana} {
+	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss, w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.VowelLoss, w.Geminate, w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.Other, w.Hiragana} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -102,6 +105,62 @@ func isLong(prev, s string) bool {
 	return v != 0 && (s == ":" || len(s) == 1 && (s[0] == v || v == 'e' && s == "i" || v == 'o' && s == "u"))
 }
 
+// consonantLedVowel returns zero for standalone vowels, length marks and
+// literal tokens. The phonetic representation stores one mora per token.
+func consonantLedVowel(sound string) byte {
+	if len(sound) < 2 || !asciiLetter(rune(sound[0])) {
+		return 0
+	}
+	return vowel(sound)
+}
+
+// left ends at the mora being lengthened. Both slices come from the registered
+// name, with the length marker under comparison omitted if it was present.
+func inRepeatedVowelRun(left, right []unit) bool {
+	v := consonantLedVowel(left[len(left)-1].sound)
+	if v == 0 {
+		return false
+	}
+	count := 1
+	for i := len(left) - 2; i >= 0 && count < 3 && consonantLedVowel(left[i].sound) == v; i-- {
+		count++
+	}
+	for i := 0; i < len(right) && count < 3 && consonantLedVowel(right[i].sound) == v; i++ {
+		count++
+	}
+	return count == 3
+}
+
+// before and after are parts of the registered reading. Look only at that
+// reading so that surrounding prose cannot enable a discounted edit.
+func (w Weights) lengthCost(before, after []unit, deletion bool) float64 {
+	prev := before[len(before)-1].sound
+	cost := w.LongInsertion
+	if deletion {
+		cost = w.LongDeletion
+	}
+	if w.RepeatedVowelPenalty != 0 && inRepeatedVowelRun(before, after) {
+		cost += w.RepeatedVowelPenalty
+	}
+	if prev == "o" && len(after) > 0 && after[0].sound == "no" {
+		cost = math.Min(cost, w.LongLoss)
+	}
+	afterMari := prev == "ri" && len(before) >= 2 && before[len(before)-2].sound == "ma"
+	beforeMasu := prev == "to" && len(after) >= 2 && after[0].sound == "ma" && after[1].sound == "su"
+	if len(after) == 0 && (prev == "di" || prev == "ti" || afterMari) {
+		cost = math.Min(cost, w.FinalLongLoss)
+	} else if len(after) > 0 && (afterMari || beforeMasu || foreignLengthBefore[[2]string{prev, after[0].sound}]) {
+		cost = math.Min(cost, w.LongLoss)
+	}
+	return cost
+}
+
+// Mora on either side of the length marker, in kana or romaji alike.
+var foreignLengthBefore = map[[2]string]bool{
+	{"de", "bi"}: true, {"de", "vi"}: true, {"she", "ku"}: true,
+	{"ni", "na"}: true, {"yo", "ha"}: true, {"ru", "chi"}: true,
+}
+
 // gap scores omitting u[i]. The matching other-side prefix and suffix give
 // context; e.g., ai/a must keep the preceding a on both sides of the alignment.
 func (w Weights) gap(u []unit, i int, other []unit, end int, reference bool) float64 {
@@ -115,11 +174,11 @@ func (w Weights) gap(u []unit, i int, other []unit, end int, reference bool) flo
 		aligned := other[end-1].sound
 		if vowel(prev) != 0 && vowel(prev) == vowel(aligned) {
 			if isLong(prev, s) {
-				weight := w.LongLoss
-				if reference && i == len(u)-1 || !reference && end == len(other) {
-					weight = w.FinalLongLoss
+				left, right := other[:end], other[end:]
+				if reference {
+					left, right = u[:i], u[i+1:]
 				}
-				cost = math.Min(cost, weight)
+				cost = math.Min(cost, w.lengthCost(left, right, reference))
 			}
 			if vowel(prev) == 'a' && s == "i" {
 				cost = math.Min(cost, w.VowelLoss)
