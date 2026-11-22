@@ -5,36 +5,45 @@ package yomiyose
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 )
 
-// Weights assigns a nonnegative edit cost to each rule. Positive infinity
-// disables a rule. Start with DefaultWeights to override individual costs.
+// Weights configures edit costs and short-candidate search limits.
+// Start with DefaultWeights to override individual settings.
 type Weights struct {
 	LongSpelling         float64 // alternative ways of writing the same long vowel
 	EiSpelling           float64 // ei vs an e long vowel
 	OuSpelling           float64 // ou vs an o long vowel
-	LongLoss             float64 // medial length difference
-	FinalLongLoss        float64 // final length difference
-	LongInsertion        float64
-	LongDeletion         float64
-	RepeatedVowelPenalty float64
+	LongLoss             float64 // length difference in a supported phonetic context
+	FinalLongLoss        float64 // supported length difference at the end of the reading
+	LongInsertion        float64 // other short vowels lengthened in the observation
+	LongDeletion         float64 // other registered long vowels shortened in the observation
+	RepeatedVowelPenalty float64 // extra length-change cost in a run of three consonant-led moras with the same vowel
 	VowelLoss            float64 // ai vs a
 	Geminate             float64 // contextual presence/absence of ッ
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
+	KanaSize             float64 // small/full-size vowel in ウィ, ウェ or シェ
 	MedialVoicing        float64 // voiced/unvoiced pairs after the first mora
 	InitialKS            float64 // same vowel with k/s in the first mora
 	TailLoss             float64 // one missing final ordinary mora of the reference
+	HeadLoss             float64 // Find/Mask: omit the first mora if six vowel-bearing moras remain
 	Other                float64 // other mora insertions, deletions and substitutions
 	Hiragana             float64 // per observed mora originally written in hiragana
+	TwoMoraMaxCost       float64 // Find/Mask ceiling for two moras; +Inf uses the caller's limit
+	ExactSingleMora      bool    // require identical normalized sounds for a one-mora candidate
 }
 
 // DefaultWeights returns initial ranking costs, not estimated probabilities.
 func DefaultWeights() Weights {
-	return Weights{LongSpelling: 0, LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25, RepeatedVowelPenalty: 2, TiChi: 0.25, VowelLoss: 0.25, Geminate: 0.25,
-		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, Other: 2, Hiragana: 0.125}
+	return Weights{
+		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25,
+		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, VowelLoss: 0.25, Geminate: 0.25,
+		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
+		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
+	}
 }
 
 // Name groups a primary spelling with optional aliases. All spellings are searched.
@@ -75,7 +84,9 @@ func NewReadings(readings []string, w Weights) (*Matcher, error) {
 
 // New compiles the name list. Weights are copied and the input slices can be reused.
 func New(names []Name, w Weights) (*Matcher, error) {
-	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss, w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.VowelLoss, w.Geminate, w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.Other, w.Hiragana} {
+	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
+		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.Geminate,
+		w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -195,13 +206,13 @@ func (w Weights) gap(u []unit, i int, other []unit, end int, reference bool) flo
 			if opposite == "do" {
 				opposite = "to"
 			}
-			if next != "" && next == opposite && (vowel(prev) == 'i' || vowel(prev) == 'u') && strings.ContainsRune("kstpchf", rune(next[0])) {
-				cost = math.Min(cost, w.Geminate)
+			if next != "" && next == opposite {
+				highVowel := vowel(prev) == 'i' || vowel(prev) == 'u'
+				if (highVowel && strings.ContainsRune("kstpchf", rune(next[0]))) || (prev == "ba" && next == "pe") {
+					cost = math.Min(cost, w.Geminate)
+				}
 			}
 		}
-	}
-	if reference && i > 0 && i == len(u)-1 && vowel(s) != 0 && end > 0 && !isLong(u[i-1].sound, s) {
-		cost = math.Min(cost, w.TailLoss)
 	}
 	return cost
 }
@@ -260,15 +271,78 @@ var tiChiPartner = partners("ti/chi")
 var voicingPartner = partners("ka/ga ki/gi ku/gu ke/ge ko/go sa/za shi/ji su/zu se/ze so/zo ta/da te/de to/do ha/ba hi/bi fu/bu he/be ho/bo")
 var ksPartner = partners("ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho")
 
+// One compact mora aligns to both sounds of its full-size spelling in one edit.
+var kanaSizePairs = [...]struct{ compact, first, second string }{
+	{"wi", "u", "i"}, {"we", "u", "e"}, {"she", "shi", "e"},
+}
+
+func compactKana(u []unit, start int) string {
+	if start < 0 || start+1 >= len(u) {
+		return ""
+	}
+	for _, p := range kanaSizePairs {
+		if u[start].sound == p.first && u[start+1].sound == p.second {
+			return p.compact
+		}
+	}
+	return ""
+}
+
+func fullSizeKana(compact string) (string, string) {
+	for _, p := range kanaSizePairs {
+		if p.compact == compact {
+			return p.first, p.second
+		}
+	}
+	return "", ""
+}
+
+// Tokenization keeps separators for alignment, but they add no spoken length.
+func countsTowardLength(t unit) bool {
+	return t.sound != " " && t.sound != "'" && t.sound != ""
+}
+
+// Count only independent vowel-bearing moras. A long vowel spelled with a
+// second kana must give the same evidence as one spelled with ー.
+func canOmitHead(a []unit) bool {
+	if len(a) < 7 || vowel(a[0].sound) == 0 || vowel(a[1].sound) == 0 || isLong(a[0].sound, a[1].sound) {
+		return false
+	}
+	count := 0
+	for i := 1; i < len(a); i++ {
+		if vowel(a[i].sound) != 0 && !isLong(a[i-1].sound, a[i].sound) {
+			count++
+		}
+	}
+	return count >= 6
+}
+
+// At this prefix boundary the "missing" last mora is actually visible just
+// after an extra length or gemination mark. Score that insertion normally.
+func tailAfterMarker(b []unit, end int, last string) bool {
+	return end+1 < len(b) && b[end+1].sound == last &&
+		(b[end].sound == "^" || isLong(b[end-1].sound, b[end].sound))
+}
+
 // align compares one name to an observation beginning at a fixed position.
 // In prefix mode it remembers the cheapest endpoint and stops as soon as all
 // live paths cost more. Future edits have nonnegative costs.
-func (w Weights) align(a, b []unit, prev, curr []float64, limit float64, prefix bool) (int, float64) {
+func (w Weights) align(a, b []unit, rows []float64, limit float64, prefix, omitHead bool) (int, float64) {
+	width := len(a) + 1
+	older, prev, curr := rows[:width], rows[width:2*width], rows[2*width:]
 	prev[0] = 0
+	referenceLength, observedLength := 0, 0
+	sameSounds := true
+	last := len(a) - 1
+	canDropTail := last > 0 && vowel(a[last].sound) != 0 && !isLong(a[last-1].sound, a[last].sound)
 	for i := range a {
 		prev[i+1] = prev[i] + w.gap(a, i, b, 0, true)
+		if prefix && countsTowardLength(a[i]) {
+			referenceLength++
+		}
 	}
 	best, end := math.Inf(1), 0
+	previousScript := 0.0
 	for j, t := range b {
 		if t.sound == "" {
 			break
@@ -279,19 +353,49 @@ func (w Weights) align(a, b []unit, prev, curr []float64, limit float64, prefix 
 		}
 		curr[0] = prev[0] + w.gap(b, j, a, 0, false) + script
 		low := curr[0]
+		compact := compactKana(b, j-1)
+		first, second := fullSizeKana(t.sound)
 		for i := range a {
 			diag := prev[i] + w.substitution(a, b, i, j) + script
+			if omitHead && j == 0 && i == 1 && a[i].sound == t.sound {
+				diag = math.Min(diag, w.HeadLoss+script)
+			}
 			del := curr[i] + w.gap(a, i, b, j+1, true)
 			ins := prev[i+1] + w.gap(b, j, a, i+1, false) + script
 			curr[i+1] = math.Min(diag, math.Min(del, ins))
+			if j > 0 && compact == a[i].sound {
+				curr[i+1] = math.Min(curr[i+1], older[i]+w.KanaSize+previousScript+script)
+			}
+			if i > 0 && a[i].sound == second && a[i-1].sound == first {
+				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.KanaSize+script)
+			}
 			low = math.Min(low, curr[i+1])
 		}
-		prev, curr = curr, prev
+		if canDropTail && !(prefix && tailAfterMarker(b, j+1, a[last].sound)) {
+			curr[last+1] = math.Min(curr[last+1], curr[last]+w.TailLoss)
+			low = math.Min(low, curr[last+1])
+		}
+		older, prev, curr = prev, curr, older
+		previousScript = script
 		if prefix {
-			if low > limit {
+			// A two-mora edit can still skip this row to finish at the next one.
+			if low > limit && (w.KanaSize > limit || compactKana(b, j) == "") {
 				break
 			}
+			if countsTowardLength(t) {
+				observedLength++
+			}
+			sameSounds = sameSounds && j < len(a) && a[j].sound == t.sound
+			// Test each endpoint independently. A rejected two-mora prefix
+			// can still lead to an eligible three-mora match.
+			shorter := min(referenceLength, observedLength)
+			if shorter == 1 && w.ExactSingleMora && !(sameSounds && j+1 == len(a)) {
+				continue
+			}
 			cost := prev[len(a)]
+			if shorter == 2 && cost > w.TwoMoraMaxCost {
+				continue
+			}
 			if cost <= limit {
 				best, end, limit = cost, j+1, cost
 			}
@@ -304,7 +408,7 @@ func (w Weights) align(a, b []unit, prev, curr []float64, limit float64, prefix 
 }
 
 // Distance is the phonetic cost of a whole reference and observation. It omits
-// the hiragana penalty used by Find. TailLoss is directional.
+// search limits and the hiragana penalty used by Find. Some edits are directional.
 func (m *Matcher) Distance(reference, observed string) float64 {
 	a, b := tokenize(reference), tokenize(observed)
 	for _, units := range [][]unit{a, b} {
@@ -314,8 +418,37 @@ func (m *Matcher) Distance(reference, observed string) float64 {
 			}
 		}
 	}
-	_, cost := m.w.align(a, b, make([]float64, len(a)+1), make([]float64, len(a)+1), math.Inf(1), false)
+	_, cost := m.w.align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
 	return cost
+}
+
+// Below Other, every eligible alignment must start with one of these sounds.
+func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []string {
+	first := form[0].sound
+	sounds := []string{first}
+	add := func(sound string) {
+		if sound != "" && !slices.Contains(sounds, sound) {
+			sounds = append(sounds, sound)
+		}
+	}
+	if omitHead {
+		add(form[1].sound)
+	}
+	if w.KanaSize <= limit {
+		add(compactKana(form, 0))
+		expanded, _ := fullSizeKana(first)
+		add(expanded)
+	}
+	if w.BV <= limit {
+		add(bvPartner[first])
+	}
+	if w.TiChi <= limit {
+		add(tiChiPartner[first])
+	}
+	if w.InitialKS <= limit {
+		add(ksPartner[first])
+	}
+	return sounds
 }
 
 // Find returns occurrences with cost <= maxCost, in source order. For each
@@ -337,34 +470,20 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 	// Bytes are marked only after all candidates at the same cost were considered.
 	occupied := make([]bool, len(text))
 	for index, name := range m.names {
+		w := &m.w
 		var hits []Match
 		for _, form := range name.forms {
-			prev, curr := make([]float64, len(form)+1), make([]float64, len(form)+1)
+			rows := make([]float64, 3*(len(form)+1))
+			omitHead := w.HeadLoss <= maxCost && canOmitHead(form)
 			check := func(i int) {
-				end, c := m.w.align(form, tokens[i:], prev, curr, maxCost, true)
+				end, c := w.align(form, tokens[i:], rows, maxCost, true, omitHead)
 				if end > 0 && !math.IsInf(c, 1) {
 					hits = append(hits, Match{name.text, index, tokens[i].start, tokens[i+end-1].end, c})
 				}
 			}
-			// Below Other, the first mora must match, or use one of the
-			// permitted initial substitutions. No initial deletion is discounted.
-			if maxCost < m.w.Other {
-				first := form[0].sound
-				for _, i := range positions[first] {
-					check(i)
-				}
-				if m.w.BV <= maxCost {
-					for _, i := range positions[bvPartner[first]] {
-						check(i)
-					}
-				}
-				if m.w.TiChi <= maxCost {
-					for _, i := range positions[tiChiPartner[first]] {
-						check(i)
-					}
-				}
-				if m.w.InitialKS <= maxCost {
-					for _, i := range positions[ksPartner[first]] {
+			if maxCost < w.Other {
+				for _, sound := range w.initialSounds(form, maxCost, omitHead) {
+					for _, i := range positions[sound] {
 						check(i)
 					}
 				}

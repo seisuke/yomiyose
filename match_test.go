@@ -23,16 +23,16 @@ func TestPhoneticRules(t *testing.T) {
 		want float64
 	}{
 		{"ヤマモトユウスケ", "ヤマモトユースケ", 0},
-		{"イシーカオリ", "イシイカオリ", 0}, {"yuusuke", "yu-suke", 0}, {"isii", "ishi:", 0},
-		{"seisuke", "se:suke", 0}, {"satou", "サトー", 0},
-		{"サイトウ", "サトウ", .25}, {"サトウ", "サイトウ", .25}, {"kato", "sato", .5},
-		{"サイトウ", "カトウ", .75}, {"りょうた", "りょう", .75},
-		{"ヴィバルディ", "ビバルディ", .25}, {"ヴィヴァルディ", "ビバルディ", .5},
-		{"デイビット", "デービット", 0}, {"デイビット", "デビット", .25},
-		{"debi^to", "デビト", .25}, {"デビト", "デビット", .25}, {"ミシェル", "ミッシェル", .25},
-		{"マーティン", "マーチン", .25}, {"ジョセフ", "ジョゼフ", .25}, {"エディー", "エディ", .125}, {"ガルーチ", "ガルチ", .25},
-		{"デービッド", "デビト", .75}, {"タナカ", "タナッカ", 2}, {"タナカ", "タッナカ", 2},
-		{"ｳﾞｨｳﾞｧﾙﾃﾞｨ", "ヴィヴァルディ", 0}, {"イシイ・カオリ", "いしーかおり", 0},
+		{"イシーカオリ", "イシイカオリ", 0}, {"yamamotoyuusuke", "yamamotoyu-suke", 0}, {"isiikaori", "ishi:kaori", 0},
+		{"kimuraseisuke", "kimurase:suke", 0}, {"satoumiho", "サトーミホ", 0},
+		{"サイトウミホ", "サトウミホ", .25}, {"サトウミホ", "サイトウミホ", .25}, {"katotakumi", "satotakumi", .5},
+		{"サイトウミホ", "カトウミホ", .75}, {"いしだりょうた", "いしだりょう", .75},
+		{"アントニオヴィバルディ", "アントニオビバルディ", .25}, {"アントニオヴィヴァルディ", "アントニオビバルディ", .5},
+		{"デイビットマッキー", "デービットマッキー", 0}, {"デイビットマッキー", "デビットマッキー", .25},
+		{"debi^tomakki:", "デビトマッキー", .25}, {"デビトマッキー", "デビットマッキー", .25}, {"ミシェルモラン", "ミッシェルモラン", .25},
+		{"マーティンホール", "マーチンホール", .25}, {"ジョセフスミス", "ジョゼフスミス", .25}, {"リーエディー", "リーエディ", .125}, {"ジョンガルーチ", "ジョンガルチ", .25},
+		{"デービッドマッキー", "デビトマッキー", .75}, {"タナカミホ", "タナッカミホ", 2}, {"タナカミホ", "タッナカミホ", 2},
+		{"ｱﾝﾄﾆｵ･ｳﾞｨｳﾞｧﾙﾃﾞｨ", "アントニオヴィヴァルディ", 0}, {"イシイ・カオリ", "いしーかおり", 0},
 	} {
 		if got := m.Distance(tc.a, tc.b); got != tc.want {
 			t.Errorf("%s -> %s = %g; want %g", tc.a, tc.b, got, tc.want)
@@ -40,8 +40,137 @@ func TestPhoneticRules(t *testing.T) {
 	}
 }
 
+func TestLongVowelContext(t *testing.T) {
+	m := mustNew(t, DefaultWeights())
+	for _, tc := range []struct {
+		short, long string
+		want        float64
+	}{
+		{"tanakamiho", "ta:nakamiho", 2}, {"タナカミホ", "タアナカミホ", 2},
+		{"タナカミホ", "タナーカミホ", 2}, {"タナカミホ", "タナカーミホ", 2},
+		{"ヤマダリク", "ヤーマダリク", 2}, {"イシイトモコ", "イシイトーモコ", 2},
+		{"デビットマッキー", "デービットマッキー", .25}, {"デビットマッキー", "デイビットマッキー", .25},
+		{"オノマイ", "オオノマイ", .25}, {"ウィリアムシェクスピア", "ウィリアムシェークスピア", .25},
+		{"ターカタミホ", "タアカタミホ", 0}, // Both readings already have the long vowel.
+	} {
+		for _, p := range [][2]string{{tc.short, tc.long}, {tc.long, tc.short}} {
+			if got := m.Distance(p[0], p[1]); got != tc.want {
+				t.Errorf("%s -> %s: got %g, want %g", p[0], p[1], got, tc.want)
+			}
+		}
+	}
+}
+
+func TestLongVowelContextInTranscript(t *testing.T) {
+	m, err := NewReadings([]string{"タナカミホ", "デビットマッキー"}, DefaultWeights())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "ターナカミホさんとデービットマッキーさん。タナカミホさん。"
+	if got := m.Mask(text, 1.5, "X"); got != "ターナカミホさんとXさん。Xさん。" {
+		t.Error(got)
+	}
+	// Bi is outside the registered reading, so it cannot license De / De:.
+	short := mustNew(t, DefaultWeights(), Name{Text: "ヤマダカナデ"})
+	if got := short.Mask("ヤマダカナデービ", .25, "X"); got != "Xービ" {
+		t.Error(got)
+	}
+}
+
+func TestFullSizeKana(t *testing.T) {
+	for _, tc := range []struct {
+		registered, observed string
+		edits                int
+		script               float64
+	}{
+		{"ウィリアムウィリス", "ウイリアム・ウイリス", 2, 0},
+		{"ウイリアムウイリス", "ウィリアム・ウィリス", 2, 0},
+		{"ウィリアムモリス", "ういリアム・モリス", 1, .25},
+		{"ウイリアムモリス", "うぃリアム・モリス", 1, .125},
+		{"ハーバートジョージウェルズ", "ハーバート・ジョージ・ウエルズ", 1, 0},
+		{"ウィリアムシェクスピア", "ウィリアム・シエクスピア", 1, 0},
+		{"wiriamumorisu", "uiriamumorisu", 1, 0},
+	} {
+		w := DefaultWeights()
+		w.KanaSize = .375
+		m := mustNew(t, w, Name{Text: tc.registered})
+		dist := float64(tc.edits) * w.KanaSize
+		if got := m.Distance(tc.registered, tc.observed); got != dist {
+			t.Errorf("%s -> %s: distance %g, want %g", tc.registered, tc.observed, got, dist)
+		}
+		text := "記録は「" + tc.observed + "」です。"
+		limit := dist + tc.script
+		h := m.Find(text, limit)
+		if len(h) != 1 || h[0].Cost != limit || text[h[0].Start:h[0].End] != tc.observed {
+			t.Errorf("%s at %g: %+v", tc.observed, limit, h)
+		}
+		if h := m.Find(text, limit-.01); len(h) != 0 {
+			t.Errorf("%s below threshold: %+v", tc.observed, h)
+		}
+	}
+	w := DefaultWeights()
+	m := mustNew(t, w, Name{Text: "ウィリアムモリス"})
+	for _, text := range []string{"ウ。イリアムモリス", "ウリアムモリス", "ウアリアムモリス"} {
+		if h := m.Find(text, .5); len(h) != 0 {
+			t.Errorf("incomplete kana pair: %+v", h)
+		}
+	}
+	w.KanaSize = math.Inf(1)
+	m = mustNew(t, w, Name{Text: "ウィリアムモリス"})
+	if h := m.Find("ウイリアムモリス", .5); len(h) != 0 {
+		t.Errorf("disabled kana-size rule: %+v", h)
+	}
+}
+
+func TestMaskLongSuffix(t *testing.T) {
+	w := DefaultWeights()
+	m := mustNew(t, w, Name{Text: "セオドアトーマス"})
+	text := "指揮はスイオドア・トマス。"
+	h := m.Find(text, 1.5)
+	if len(h) != 1 || h[0].Cost != 1.5 || text[h[0].Start:h[0].End] != "オドア・トマス" {
+		t.Fatalf("long suffix: %+v", h)
+	}
+	if len(m.Find(text, 1.49)) != 0 || m.Distance("セオドアトーマス", "スイオドア・トマス") <= 1.5 {
+		t.Error("head loss must apply only to an eligible search span")
+	}
+	for _, registered := range []string{"オカダユウスケ", "オカダユースケ"} {
+		m := mustNew(t, w, Name{Text: registered})
+		if h := m.Find("カダユースケ", 1.5); len(h) != 0 {
+			t.Errorf("%s: counted vowel length as an independent mora: %+v", registered, h)
+		}
+	}
+	w.HeadLoss = math.Inf(1)
+	m = mustNew(t, w, Name{Text: "セオドアトーマス"})
+	if len(m.Find(text, 1.5)) != 0 {
+		t.Error("disabled head loss")
+	}
+	for _, field := range []*float64{&w.HeadLoss, &w.KanaSize} {
+		*field = -1
+		if _, err := New(nil, w); err == nil {
+			t.Error("accepted negative rule cost")
+		}
+		*field = 0
+	}
+}
+
+func TestRepeatedVowelPenaltyWeight(t *testing.T) {
+	w := DefaultWeights()
+	w.LongDeletion = .25
+	for _, tc := range []struct{ penalty, want float64 }{{0, .25}, {.5, .75}} {
+		w.RepeatedVowelPenalty = tc.penalty
+		m := mustNew(t, w)
+		if got := m.Distance("ta:nakamiho", "tanakamiho"); got != tc.want {
+			t.Errorf("penalty %g: distance = %g, want %g", tc.penalty, got, tc.want)
+		}
+	}
+	w.RepeatedVowelPenalty = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted negative long-vowel context penalty")
+	}
+}
+
 func TestMaskTranscript(t *testing.T) {
-	readings := []string{"ヴィバルディ", "イシーカオリ"}
+	readings := []string{"アントニオヴィバルディ", "イシーカオリ"}
 	m, err := NewReadings(readings, DefaultWeights())
 	if err != nil {
 		t.Fatal(err)
@@ -66,8 +195,8 @@ func TestMaskTranscript(t *testing.T) {
 
 func TestThresholdAndScript(t *testing.T) {
 	w := DefaultWeights()
-	m := mustNew(t, w, Name{Text: "サイトウ"})
-	text := "サトウ。さいとう。サイトウ"
+	m := mustNew(t, w, Name{Text: "サイトウミホ"})
+	text := "サトウミホ。さいとうミホ。サイトウミホ"
 	for _, tc := range []struct {
 		threshold float64
 		want      int
@@ -78,28 +207,28 @@ func TestThresholdAndScript(t *testing.T) {
 	}
 	w.Hiragana = 0
 	w.VowelLoss = 1.25
-	m = mustNew(t, w, Name{Text: "サイトウ"})
+	m = mustNew(t, w, Name{Text: "サイトウミホ"})
 	if got := m.Find(text, .5); len(got) != 2 || got[0].Cost != 0 {
 		t.Errorf("custom weights: %+v", got)
 	}
 }
 
 func TestBoundariesAndOverlap(t *testing.T) {
-	m := mustNew(t, DefaultWeights(), Name{Text: "ナナ"}, Name{Text: "ナナコ"})
-	if got := m.Mask("🟢ナナナコ、ナ。ナ", 0, "X"); got != "🟢X、ナ。ナ" {
+	m := mustNew(t, DefaultWeights(), Name{Text: "ウエノマキ"}, Name{Text: "マキサトシ"})
+	if got := m.Mask("🟢ウエノマキサトシ、ウエノ。マキ", 0, "X"); got != "🟢X、ウエノ。マキ" {
 		t.Error(got)
 	}
-	m = mustNew(t, DefaultWeights(), Name{Text: "デイビット", Readings: []string{"デービット"}})
-	text := "『ﾃﾞｰﾋﾞｯﾄ』とデ・イビット"
+	m = mustNew(t, DefaultWeights(), Name{Text: "デイビットマッキー", Readings: []string{"デービットマッキー"}})
+	text := "『ﾃﾞｰﾋﾞｯﾄ･ﾏｯｷｰ』とデ・イビットマッキー"
 	if got := m.Mask(text, 0, "*"); got != "『*』と*" {
 		t.Error(got)
 	}
-	if got := m.Find("デイ。ビット", 1.5); len(got) != 0 {
+	if got := m.Find("デイ。ビットマッキー", 1.5); len(got) != 0 {
 		t.Errorf("crossed punctuation: %+v", got)
 	}
 	// A following vowel in prose is outside the name even if it could be folded.
-	m = mustNew(t, DefaultWeights(), Name{Text: "イシイ"})
-	if got := m.Mask("きいしいです", .5, "X"); got != "きXです" {
+	m = mustNew(t, DefaultWeights(), Name{Text: "イシイミホ"})
+	if got := m.Mask("きいしいミホです", .5, "X"); got != "きXです" {
 		t.Error(got)
 	}
 }
@@ -107,11 +236,11 @@ func TestBoundariesAndOverlap(t *testing.T) {
 func TestInvalidAndDisabled(t *testing.T) {
 	w := DefaultWeights()
 	w.BV = math.Inf(1)
-	m := mustNew(t, w, Name{Text: "ビバルディ"})
-	if got := m.Find("ヴィバルディ", 1.5); len(got) != 0 {
+	m := mustNew(t, w, Name{Text: "アントニオビバルディ"})
+	if got := m.Find("アントニオヴィバルディ", 1.5); len(got) != 0 {
 		t.Errorf("disabled b/v: %+v", got)
 	}
-	if got := m.Find("ビバルディ", math.NaN()); len(got) != 0 {
+	if got := m.Find("アントニオビバルディ", math.NaN()); len(got) != 0 {
 		t.Error(got)
 	}
 	for _, name := range []string{"", "・", "ア。イ"} {
@@ -144,13 +273,13 @@ func TestTunableRulesAndSearchFallback(t *testing.T) {
 	w := DefaultWeights()
 	w.EiSpelling, w.OuSpelling = .125, .5
 	w.Geminate, w.InitialKS, w.TailLoss = .5, 1, 1.25
-	m := mustNew(t, w, Name{Text: "石井 香織", Readings: []string{"イシーカオリ"}}, Name{Text: "サトウ"})
+	m := mustNew(t, w, Name{Text: "石井 香織", Readings: []string{"イシーカオリ"}}, Name{Text: "サトウミホ"})
 	for _, tc := range []struct {
 		a, b string
 		want float64
 	}{
-		{"セイスケ", "セースケ", .125}, {"サトウ", "サトー", .5},
-		{"デビット", "デビト", .5}, {"サトウ", "カトウ", 1}, {"りょうた", "りょう", 1.25},
+		{"キムラセイスケ", "キムラセースケ", .125}, {"サトウミホ", "サトーミホ", .5},
+		{"デビットマッキー", "デビトマッキー", .5}, {"サトウミホ", "カトウミホ", 1}, {"いしだりょうた", "いしだりょう", 1.25},
 	} {
 		if got := m.Distance(tc.a, tc.b); got != tc.want {
 			t.Errorf("%s/%s = %g, want %g", tc.a, tc.b, got, tc.want)
@@ -161,16 +290,16 @@ func TestTunableRulesAndSearchFallback(t *testing.T) {
 	}
 	// Once ordinary edits are affordable, a name can start with an
 	// arbitrary substituted mora. The indexed path must not omit this hit.
-	m = mustNew(t, DefaultWeights(), Name{Text: "キムラ"})
-	hits := m.Find("昨日、タムラさん。", 2)
-	if len(hits) != 1 || hits[0].Start != len("昨日、") || hits[0].End != len("昨日、タムラ") || hits[0].Cost != 2 {
+	m = mustNew(t, DefaultWeights(), Name{Text: "キムラアヤ"})
+	hits := m.Find("昨日、タムラアヤさん。", 2)
+	if len(hits) != 1 || hits[0].Start != len("昨日、") || hits[0].End != len("昨日、タムラアヤ") || hits[0].Cost != 2 {
 		t.Errorf("%+v", hits)
 	}
 }
 
 func TestSearchDoesNotBorrowLongVowelContext(t *testing.T) {
-	m := mustNew(t, DefaultWeights(), Name{Text: "イワタ"})
-	if h := m.Find("キーワタ", 0); len(h) != 0 {
+	m := mustNew(t, DefaultWeights(), Name{Text: "イワタサキ"})
+	if h := m.Find("キーワタサキ", 0); len(h) != 0 {
 		t.Errorf("borrowed text outside match: %+v", h)
 	}
 }
@@ -196,5 +325,55 @@ func TestDirectionalLengthCosts(t *testing.T) {
 		if got := m.Distance(tc.long, tc.short); got != tc.drop {
 			t.Errorf("%s -> %s: %g, want %g", tc.long, tc.short, got, tc.drop)
 		}
+	}
+}
+
+func TestLengthSettings(t *testing.T) {
+	w := DefaultWeights()
+	w.LongInsertion, w.LongDeletion = .625, .875
+	w.LongLoss, w.FinalLongLoss = .375, .5
+	m := mustNew(t, w)
+	for _, tc := range []struct {
+		a, b string
+		want float64
+	}{
+		{"サカケイスケ", "サーカケイスケ", .625}, {"サーカケイスケ", "サカケイスケ", .875},
+		{"ジェロームデビス", "ジェロームデービス", .375}, {"リーエディ", "リーエディー", .5},
+	} {
+		if got := m.Distance(tc.a, tc.b); got != tc.want {
+			t.Errorf("%s -> %s: %g, want %g", tc.a, tc.b, got, tc.want)
+		}
+	}
+	// A raised search limit lets the two-mora surname fragment test the cap
+	// independently of the cost of dropping the given name.
+	for _, cap := range []float64{1, 2.75, 3, math.Inf(1)} {
+		w := DefaultWeights()
+		w.TwoMoraMaxCost = cap
+		m := mustNew(t, w, Name{Text: "オノアキ"})
+		for _, sample := range []struct {
+			text string
+			cost float64
+		}{{"オノ", 2.75}, {"おの", 3}} {
+			for _, limit := range []float64{1.5, 2.75, 3} {
+				got := len(m.Find(sample.text, limit)) != 0
+				if want := sample.cost <= min(cap, limit); got != want {
+					t.Errorf("%s cap=%g limit=%g hit=%v, want %v", sample.text, cap, limit, got, want)
+				}
+			}
+		}
+	}
+	w = DefaultWeights()
+	w.TwoMoraMaxCost = 0
+	m = mustNew(t, w, Name{Text: "カトウアヤ"})
+	if got := m.Mask("さとうアヤ", 1, "X"); got != "X" {
+		t.Fatalf("two-mora limit prematurely stopped a longer alignment: %q", got)
+	}
+	for _, field := range []*float64{&w.TwoMoraMaxCost, &w.LongInsertion, &w.LongDeletion} {
+		saved := *field
+		*field = -1
+		if _, err := New(nil, w); err == nil {
+			t.Error("accepted a negative length setting")
+		}
+		*field = saved
 	}
 }
