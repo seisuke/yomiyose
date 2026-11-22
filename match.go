@@ -28,6 +28,8 @@ type Weights struct {
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
 	KanaSize             float64 // small/full-size vowel in ウィ, ウェ or シェ
+	ShiShu               float64 // シ/シュ in Japanese or foreign names
+	RiRu                 float64 // リ/ル under foreign-name rules
 	MedialVoicing        float64 // voiced/unvoiced pairs after the first mora
 	InitialKS            float64 // same vowel with k/s in the first mora
 	TailLoss             float64 // one missing final ordinary mora of the reference
@@ -42,7 +44,7 @@ type Weights struct {
 func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25,
-		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, VowelLoss: 0.25, Geminate: 0.25,
+		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: math.Inf(1),
 		BV:           0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
@@ -82,6 +84,7 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 	case JapaneseRules:
 		w.FinalLongLoss, w.Geminate, w.BV = off, off, off
 		w.TiChi, w.KanaSize, w.GlideAfterOU = off, off, off
+		w.RiRu = off
 	case ForeignRules:
 		w.VowelLoss, w.InitialKS = off, off
 		w.RepeatedVowelPenalty = 0
@@ -133,7 +136,7 @@ func New(names []Name, w Weights) (*Matcher, error) {
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.Geminate,
-		w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
+		w.BV, w.ShiShu, w.RiRu, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -306,8 +309,20 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	if tiChiPartner[x] == y {
 		cost = math.Min(cost, w.TiChi)
 	}
-	if i > 0 && j > 0 && (voicingPartner[x] == y || w.scope != JapaneseRules && foreignVoicingPartner[x] == y) {
-		cost = math.Min(cost, w.MedialVoicing)
+	if shiShuPartner[x] == y {
+		cost = math.Min(cost, w.ShiShu)
+	}
+	if riRuPartner[x] == y {
+		cost = math.Min(cost, w.RiRu)
+	}
+	if i > 0 && j > 0 {
+		if voicingPartner[x] == y || w.scope != JapaneseRules && foreignVoicingPartner[x] == y {
+			cost = math.Min(cost, w.MedialVoicing)
+		}
+		// シュ/ジ changes both the vowel (シュ/シ) and voicing (シ/ジ) in one mora.
+		if w.scope != JapaneseRules && (x == "shu" && y == "ji" || x == "ji" && y == "shu") {
+			cost = math.Min(cost, w.ShiShu+w.MedialVoicing)
+		}
 	}
 	if (x == "a" && y == "wa" || x == "wa" && y == "a") &&
 		i > 0 && j > 0 && i+1 < len(a) && j+1 < len(b) &&
@@ -333,7 +348,9 @@ func partners(pairs string) map[string]string {
 var bvPartner = partners("ba/va bi/vi bu/vu be/ve bo/vo byu/vyu")
 var tiChiPartner = partners("ti/chi")
 var voicingPartner = partners("ka/ga ki/gi ku/gu ke/ge ko/go sa/za shi/ji su/zu se/ze so/zo ta/da te/de to/do ha/ba hi/bi fu/bu he/be ho/bo")
-var foreignVoicingPartner = partners("je/she")
+var foreignVoicingPartner = partners("je/she ba/pa")
+var shiShuPartner = partners("shi/shu")
+var riRuPartner = partners("ri/ru")
 var ksPartner = partners("ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho")
 
 // One compact mora aligns to both sounds of its full-size spelling in one edit.
@@ -518,6 +535,12 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 	}
 	if w.TiChi <= limit {
 		add(tiChiPartner[first])
+	}
+	if w.ShiShu <= limit {
+		add(shiShuPartner[first])
+	}
+	if w.RiRu <= limit {
+		add(riRuPartner[first])
 	}
 	if w.InitialKS <= limit {
 		add(ksPartner[first])

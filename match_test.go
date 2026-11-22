@@ -35,6 +35,15 @@ func TestRuleSetDistances(t *testing.T) {
 		{"ジェームズ・パジェット", "ジェームス・パシェット", .5, 2.25, .5},
 		{"ジェームス・パシェット", "ジェームズ・パジェット", .5, 2.25, .5},
 		{"ジェームズ・パジェット", "シェームズ・パジェット", 2, 2, 2},
+		{"キム・シウ", "キム・シュウ", .5, .5, .5},
+		{"kimusyuu", "kimusiu", .5, .5, .5},
+		{"タナカしゅうじ", "タナカシウジ", .5, .5, .5},
+		{"タナカシウジ", "タナカシュウジ", .5, .5, .5},
+		{"ジョシュ・ホーキンソン", "ジョジホーキンソン", .75, 2, .75},
+		{"ジョジホーキンソン", "ジョシュ・ホーキンソン", .75, 2, .75},
+		{"ジェームズ・バリ", "ジェームス・パル", 1, 4.25, 1},
+		{"ジェームス・パル", "ジェームズ・バリ", 1, 4.25, 1},
+		{"キム・ミウ", "キム・ムウ", 2, 2, 2},
 		{"マーティンホール", "マーチンホール", .25, 2, .25},
 		{"ウィリアムモリス", "ウイリアムモリス", .25, 4, .25},
 		{"リーエディー", "リーエディ", .125, 1.25, .125},
@@ -65,6 +74,50 @@ func TestRuleSetDistances(t *testing.T) {
 	if j, f := m.DistanceWithRules("タナカミホ", "ターナカミホ", JapaneseRules),
 		m.DistanceWithRules("タナカミホ", "ターナカミホ", ForeignRules); j != 2 || f != .5 {
 		t.Errorf("repeated-vowel penalty: Japanese %g, foreign %g", j, f)
+	}
+}
+
+func TestHighVowelWeights(t *testing.T) {
+	w := DefaultWeights()
+	w.ShiShu = .625
+	w.RiRu = .875
+	w.MedialVoicing = .5
+	m := mustNew(t, w, Name{Text: "シウ・キム"})
+	const text = "受付でシュウ・キムさんをお呼びします。"
+	if got := m.Mask(text, .625, "■"); got != "受付で■さんをお呼びします。" {
+		t.Errorf("initial シ/シュ: got %q", got)
+	}
+	if got := m.Mask(text, .624, "■"); got != text {
+		t.Errorf("below the substitution cost: got %q", got)
+	}
+	if got := m.Distance("ジョシュ・ホーキンソン", "ジョジホーキンソン"); got != 1.125 {
+		t.Errorf("composed vowel and voicing cost: got %g, want 1.125", got)
+	}
+	if got := m.Distance("ジェームズ・バリ", "ジェームズ・バル"); got != .875 {
+		t.Errorf("tuned リ/ル: got %g, want .875", got)
+	}
+	w.ShiShu = math.Inf(1)
+	m = mustNew(t, w)
+	if got := m.Distance("ジョシュ・ホーキンソン", "ジョジホーキンソン"); got != w.Other {
+		t.Errorf("disabled vowel rule: got %g, want %g", got, w.Other)
+	}
+	w.RiRu = -1
+	if _, err := NewReadings(nil, w); err == nil {
+		t.Error("accepted a negative high-vowel cost")
+	}
+}
+
+func TestJapaneseShujiMask(t *testing.T) {
+	m, err := NewScoped([]ScopedName{{Name: Name{Text: "タナカしゅうじ"}, Rules: JapaneseRules}}, DefaultWeights())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const text = "担当はタナカシウジさん、次はタナカしうじさんです。"
+	if got := m.Mask(text, .5, "■"); got != "担当は■さん、次はタナカしうじさんです。" {
+		t.Errorf("at the katakana cost: got %q", got)
+	}
+	if got := m.Mask(text, .875, "■"); got != "担当は■さん、次は■さんです。" {
+		t.Errorf("including three hiragana moras: got %q", got)
 	}
 }
 
