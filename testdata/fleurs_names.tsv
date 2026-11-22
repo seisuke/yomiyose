@@ -1,0 +1,13 @@
+utterance	model	reference	hypothesis	default_mask	long_mask	glide_mask
+fleurs-0075	openai/whisper-large-v3-turbo	ラホール・ドラヴィッド	ラホール・ドラビット	■	■	■
+fleurs-0160	openai/whisper-large-v3-turbo	アーノルド・シュワルツェネッガー	アーノルド・シュワルツネッカー	=	=	=
+fleurs-0332	openai/whisper-large-v3	トゥプア・タマセーゼ・レアロフィ	トゥプワ・タマセイゼ・レアロフィー	=	=	■ー
+fleurs-0334	openai/whisper-large-v3	トゥプア・タマセーゼ・レアロフィ	トゥプワ・タマセーゼ・レアロフィー	=	=	■ー
+fleurs-0380	openai/whisper-large-v3-turbo	ジェームズ・パジェット	ジェームス・パシェット	■	■	■
+fleurs-0424	openai/whisper-large-v3-turbo	レセップ・タイップ・エルドアン	レセップ・タイプ・エルドワン	=	=	■
+fleurs-0425	openai/whisper-large-v3-turbo	レセップ・タイップ・エルドアン	レセプ・タイプ・エルドアン	=	=	=
+fleurs-0488	openai/whisper-medium	ダニエル・ランターニュ	ダニエル・ランタニュ	■	■	■
+fleurs-0551	openai/whisper-large-v3-turbo	オルドリッチ・イェリネク	オルドリッチ・エリネグ	=	=	=
+fleurs-0552	openai/whisper-large-v3-turbo	グレン・クッシング	グレン・プッシング	=	=	=
+fleurs-0602	openai/whisper-large-v3-turbo	ジャンカルロ・フィジケラ	ジャン・カルド・フィジケラ	=	=	=
+fleurs-0620	kotoba-tech/kotoba-whisper-v2.0	ロランド・メンドーサ	ロランド・メンドウサ	■	■	■

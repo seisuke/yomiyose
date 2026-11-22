@@ -61,6 +61,75 @@ func readCorpus(t *testing.T, path string, fields int) [][]string {
 	return rows
 }
 
+// Each hypothesis is a verbatim name span from a published ASR run. Keep the
+// carrier fixed to compare edit rules without changing the surrounding text.
+func TestFLEURSNameMasks(t *testing.T) {
+	rows := readCorpus(t, "testdata/fleurs_names.tsv", 7)
+	base := DefaultWeights()
+	length, glide := base, base
+	length.LongInsertion = 1.5
+	glide.GlideAfterOU = 0.5
+	for _, tc := range []struct {
+		label   string
+		column  int
+		weights Weights
+		rules   RuleSet
+	}{
+		{"default_mask", 4, base, AllRules}, {"long_mask", 5, length, AllRules},
+		{"glide_mask", 6, glide, AllRules}, {"foreign_rules", 4, base, ForeignRules},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			const prefix, suffix = "記録は「", "」です。"
+			full, partial, exposed := 0, 0, 0
+			for _, row := range rows[1:] {
+				m, err := NewScoped([]ScopedName{{Name: Name{Text: row[2]}, Rules: tc.rules}}, tc.weights)
+				if err != nil {
+					t.Fatal(err)
+				}
+				input := prefix + row[3] + suffix
+				got := m.Mask(input, 1.5, "■")
+				want := row[tc.column]
+				if want == "=" {
+					want = row[3]
+				}
+				if got != prefix+want+suffix {
+					t.Errorf("%s %s: got %q, want %q", row[0], row[1], got, prefix+want+suffix)
+				}
+				switch got {
+				case input:
+					exposed++
+				case prefix + "■" + suffix:
+					full++
+				default:
+					partial++
+				}
+			}
+			t.Logf("mentions=%d full=%d partial=%d exposed=%d", len(rows)-1, full, partial, exposed)
+		})
+	}
+}
+
+func TestJapaneseASRReadingExamples(t *testing.T) {
+	rows := readCorpus(t, "testdata/japanese_asr_names.tsv", 7)
+	for _, row := range rows[1:] {
+		if row[5] == "-" { // Only the written reference and prediction were recorded.
+			continue
+		}
+		t.Run(row[1], func(t *testing.T) {
+			for _, scope := range []RuleSet{AllRules, JapaneseRules} {
+				m, err := NewScoped([]ScopedName{{Name: Name{Text: row[4]}, Rules: scope}}, DefaultWeights())
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := m.Mask("記録は「"+row[5]+"」です。", 1.5, "■")
+				if want := "記録は「" + row[6] + "」です。"; got != want {
+					t.Errorf("rules %d: %s -> %s: got %q, want %q", scope, row[4], row[5], got, want)
+				}
+			}
+		})
+	}
+}
+
 func checkTranscriptCorpus(t *testing.T, w Weights, overrides map[string]string) {
 	t.Helper()
 	rows := readCorpus(t, "testdata/transcripts.tsv", 4)
