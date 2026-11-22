@@ -56,17 +56,20 @@ func TestTupuaFullNameMask(t *testing.T) {
 	const observed = "トワッパー・タマセ・ゼ・デアロフィ"
 	w := DefaultWeights()
 	w.LimitByMoraCount = true
-	m, err := NewScoped([]ScopedName{{Name: Name{Text: name}, Rules: ForeignRules}}, w)
+	m, err := NewReadings([]string{name}, w)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := m.DistanceWithRules(name, observed, ForeignRules); got != 2 {
 		t.Errorf("foreign distance = %g", got)
 	}
-	if got := m.Distance(name, observed); got != 2.5 {
+	if got := m.Distance(name, observed); got != 2 {
 		t.Errorf("all-rules distance = %g", got)
 	}
 	const text = "受付は「" + observed + "」です。"
+	if hits := m.Find(text, 2); len(hits) != 1 || hits[0].Name != name || hits[0].Cost != 2 || text[hits[0].Start:hits[0].End] != observed {
+		t.Errorf("full name span at 2: %+v", hits)
+	}
 	if got := m.Mask(text, 2, "■"); got != "受付は「■」です。" {
 		t.Errorf("mask at 2: %q", got)
 	}
@@ -75,8 +78,21 @@ func TestTupuaFullNameMask(t *testing.T) {
 	}
 	w.ForeignLongInsertion, w.ForeignLongDeletion = .625, .875
 	m = mustNew(t, w)
-	if got := m.DistanceWithRules(name, observed, ForeignRules); got != 2.5 {
-		t.Errorf("custom foreign length costs: %g", got)
+	for _, scope := range []RuleSet{AllRules, ForeignRules} {
+		if got := m.DistanceWithRules(name, observed, scope); got != 2.5 {
+			t.Errorf("custom length costs with rules %d: %g", scope, got)
+		}
+	}
+}
+
+func TestLongVowelsInAlternateReadings(t *testing.T) {
+	m := mustNew(t, DefaultWeights(), Name{Text: "レナ・ビダル", Readings: []string{"レナ・ヴィダル"}})
+	const text = "記録は「レーナ・ビダル」「レーナ・ヴィダル」です。"
+	if got := m.Mask(text, .5, "■"); got != "記録は「レーナ・ビダル」「■」です。" {
+		t.Errorf("length cost per reading: %q", got)
+	}
+	if got := m.Mask(text, .75, "■"); got != "記録は「■」「■」です。" {
+		t.Errorf("both readings: %q", got)
 	}
 }
 
@@ -90,8 +106,8 @@ func TestShortenedTupuaTranscript(t *testing.T) {
 		observed string
 		cost     float64
 	}{
-		{"トゥプア・タマセゼ・レアロ", 1.5}, // missing ー and final フィ
-		{"トゥプア・タマセーゼ・レアフィ", 1}, // missing medial ロ
+		{"トゥプア・タマセゼ・レアロ", 1.25}, // missing ー and final フィ
+		{"トゥプア・タマセーゼ・レアフィ", 1},  // missing medial ロ
 	} {
 		const prefix, suffix = "先ほど、", "さんが受付に来ました。"
 		text := prefix + tc.observed + suffix

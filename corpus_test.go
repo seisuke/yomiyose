@@ -80,7 +80,7 @@ func TestFLEURSNameMasks(t *testing.T) {
 	}{
 		{"default_mask", 4, base, AllRules, 1.5}, {"long_mask", 5, length, AllRules, 1.5},
 		{"no_glide_mask", 6, noGlide, AllRules, 1.5}, {"foreign_rules", 4, base, ForeignRules, 1.5},
-		{"foreign_by_length", 7, byLength, ForeignRules, 2},
+		{"default_by_length", 7, byLength, AllRules, 2}, {"foreign_by_length", 7, byLength, ForeignRules, 2},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			const prefix, suffix = "記録は「", "」です。"

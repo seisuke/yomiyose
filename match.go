@@ -21,8 +21,8 @@ type Weights struct {
 	FinalLongLoss        float64 // supported length difference at the end of the reading
 	LongInsertion        float64 // other short vowels lengthened in the observation
 	LongDeletion         float64 // other registered long vowels shortened in the observation
-	ForeignLongInsertion float64 // replaces LongInsertion for explicitly scoped ForeignRules
-	ForeignLongDeletion  float64 // replaces LongDeletion for explicitly scoped ForeignRules
+	ForeignLongInsertion float64 // lengthening cost for readings containing designated loanword moras
+	ForeignLongDeletion  float64 // shortening cost for readings containing designated loanword moras
 	RepeatedVowelPenalty float64 // extra length-change cost in a run of three consonant-led moras with the same vowel
 	VowelLoss            float64 // ai vs a
 	GlideAfterOU         float64 // medial ア/ワ after a matching o/u mora and before a matching sound
@@ -97,11 +97,24 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 		w.TuToWa, w.PuaContraction = off, off
 		w.RiRu, w.RD = off, off
 	case ForeignRules:
-		w.LongInsertion, w.LongDeletion = w.ForeignLongInsertion, w.ForeignLongDeletion
 		w.VowelLoss, w.InitialKS, w.KuGemination = off, off, off
 		w.RepeatedVowelPenalty = 0
 	}
 	return ruleWeights{Weights: w, scope: scope}
+}
+
+// Only the registered reading supplies evidence for changing vowel-length costs.
+func (w ruleWeights) forReading(form []unit) ruleWeights {
+	if w.scope != JapaneseRules {
+		for _, mora := range form {
+			switch mora.sound {
+			case "tu", "du", "ti", "di", "va", "vi", "ve", "vo", "fi", "fe", "fo":
+				w.LongInsertion, w.LongDeletion = w.ForeignLongInsertion, w.ForeignLongDeletion
+				return w
+			}
+		}
+	}
+	return w
 }
 
 // Match identifies text[Start:End] in the original UTF-8 input.
@@ -608,7 +621,8 @@ func (m *Matcher) DistanceWithRules(reference, observed string, rules RuleSet) f
 			}
 		}
 	}
-	_, cost := m.rules[rules].align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
+	w := m.rules[rules].forReading(a)
+	_, cost := w.align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
 	return cost
 }
 
@@ -676,9 +690,9 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 	// Bytes are marked only after all candidates at the same cost were considered.
 	occupied := make([]bool, len(text))
 	for index, name := range m.names {
-		w := &m.rules[name.rules]
 		var hits []Match
 		for _, form := range name.forms {
+			w := m.rules[name.rules].forReading(form)
 			limit := maxCost
 			if w.LimitByMoraCount {
 				moras := 0
