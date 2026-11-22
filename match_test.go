@@ -173,6 +173,7 @@ func TestGlideAfterOU(t *testing.T) {
 	if got := m.Distance("トゥプワタマセーゼレアロフィ", "トゥプアタマセーゼレアロフィ"); got != .5 {
 		t.Errorf("inverse glide: %g", got)
 	}
+	t.Run("transcripts", func(t *testing.T) { checkTranscriptCorpus(t, w, nil) })
 	w.GlideAfterOU = -1
 	if _, err := NewReadings(nil, w); err == nil {
 		t.Error("accepted a negative glide cost")
@@ -494,4 +495,20 @@ func TestLengthSettings(t *testing.T) {
 		}
 		*field = saved
 	}
+}
+
+func TestRelaxedTwoMoraCorpus(t *testing.T) {
+	w := DefaultWeights()
+	w.TwoMoraMaxCost = 1.25
+	t.Run("two-mora", func(t *testing.T) { checkTranscriptCorpus(t, w, nil) })
+
+	w.LongInsertion = 1.5
+	want := map[string]string{
+		"length-yoshida":   "■と■。",
+		"length-yusuke":    "■、■。",
+		"length-saka":      "■、■。",
+		"length-rena":      "■さん、■さん。",
+		"joined-expansion": "■さん。",
+	}
+	t.Run("including-lengthening", func(t *testing.T) { checkTranscriptCorpus(t, w, want) })
 }
