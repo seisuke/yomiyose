@@ -5,9 +5,9 @@
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
 | [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
-| [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人10人、16出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
+| [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人11人、21出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
 | [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人10人、10発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
-| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話 | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与 |
+| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話（原表記の参考資料） | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与。公開STTのかな氏名のマスク性能集計からは全7件を除外 |
 
 ## テストデータの利用条件
 
@@ -49,11 +49,11 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 | 資料・現象 | 実装・テストへの反映と未使用の情報 |
 |---|---|
 | 荒井（1999）の母音脱落と促音化 | 「聞くこと → きっこと」をもとに、日本人名向けの `KuGemination` を実装。手作りの「タナカキクコ → タナカキッコ」で距離 `0.5` とマスク範囲を検証した。「と思って」の連続母音に関しては、長音の脱落で表せる場合を既存規則で扱い、発話の持続時間は入力に使っていない。 |
-| 前川の「キクチ」と Hara の姓名境界の母音 | キクチの無声化率から仮名「ク」が丸ごと消える率は求められず、「キクチユウスケ → キチユウスケ」は通常の脱落 `2` としてテスト。Hara が測ったのは姓名境界の母音の持続時間。姓と名を分割せず読みを受け取る本ライブラリには、境界専用の母音脱落規則はない。 |
+| 前川の「キクチ」と Hara の姓名境界の母音 | キクチの無声化率から仮名「ク」が丸ごと消える率は求められず、「キクチユウスケ → キチユウスケ」は通常の語中脱落（`MedialLoss = 1`）としてテスト。Hara が測ったのは姓名境界の母音の持続時間。姓と名を分割せず読みを受け取る本ライブラリには、境界専用の母音脱落規則はない。 |
 | CSJの長母音の短呼・文化庁の仮名遣い | 「サトウレーナ → サトウレナ」は `LongDeletion` で `0.75`、「サトウミホ → サトーミホ」は `OuSpelling` で `0`。CSJの語頭・語中・語末別の発生率を重みとして用いる処理はない。 |
-| 浅井の姓末ハ／ワ・高橋・梅村の姓のかな異表記 | 「オトワユウスケ → オトはユウスケ」には `HaAsWa` を使う。「オトハユウスケ → オトワユウスケ」は距離 `2` で、姓に定着した異読を一律に置換する規則はない。語中の清濁は `MedialVoicing` で扱う。高橋・梅村の姓別の正規化規則群は取り込んでいない。[高橋・梅村の研究](https://ipsj.ixsq.nii.ac.jp/records/13848) |
+| 浅井の姓末ハ／ワ・高橋・梅村の姓のかな異表記 | 「オトワユウスケ → オトはユウスケ」には `HaAsWa` を使う。「オトハユウスケ → オトワユウスケ」は通常の置換で距離 `1` で、姓に定着した異読を一律に置換する規則はない。語中の清濁は `MedialVoicing` で扱う。高橋・梅村の姓別の正規化規則群は取り込んでいない。[高橋・梅村の研究](https://ipsj.ixsq.nii.ac.jp/records/13848) |
 | 日本人名のWhisper出力7件 | 「ケント → ケンタ」「ヒデヨ → ヒデオ」の2件は人手でかなを仮定し、末尾1文字を残す部分マスクを検証。残る5件は原表記を記録した。漢字の読みの推定と一般語への置き換わりは、かな照合の評価に含めていない。[7件の原表記と評価対象](testdata/japanese_asr_names.tsv) |
-| CJKI の JEN・JNV、ELRA の人名音声 | JEN の姓名頻度による分類と ELRA 音声での評価は未実施。JNV の公開例には部分的な対応がある。「サトウミホ」と `satoumiho / satoomiho / satomiho` の距離は順に `0 / 0 / 0.75`。`satōmiho` と `satohmiho` は閾値 `1.5` での読み全体の照合に使えず、長音の別表記としての正規化は未実装。撥音の後に母音が続く「ケンイチ」に対する `kenichi / ken’ichi` も正規化していない。[CJKI の公開例](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/) |
+| CJKI の JEN・JNV、ELRA の人名音声 | JEN の姓名頻度による分類と ELRA 音声での評価は未実施。JNV の公開例には部分的な対応がある。「サトウミホ」と `satoumiho / satoomiho / satomiho` の距離は順に `0 / 0 / 0.75`。`satōmiho` は全体照合の対象外で、`satohmiho` は通常の置換で距離 `1`。両表記を長音として正規化する規則は未実装。撥音の後に母音が続く「ケンイチ」に対する `kenichi / ken’ichi` も正規化していない。[CJKI の公開例](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/) |
 
 ## 外国人名の発話別STT出力
 
@@ -67,11 +67,45 @@ JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpe
 
 比較できるフルネームがあり、既存の規則で拾える例と取りこぼす例を含む12行を選んだ。`utterance` は配布元が付けた `id`、`model` は同じ行にあるモデル識別子。各行の登録名は `reference`、観測名は `hypothesis` の部分文字列と照合して確認した。当初の12行はWhisper large-v3-turbo、large-v3、medium、Kotoba-Whisper v2.0の出力。後に、同じ10人を7,150出力の全文で照合し、長音コストの変更でマスク結果が変わった4行を追記した。いずれも同じJSONLにある別モデルの出力。周囲の文だけをテスト用に統一した。マスク期待値の `=` は観測名がそのまま残ることを示す。音声の聞き直し、独立の話者数の確認、この標本からの発生率の推定は行っていない。
 
+### ラ行と D・T の聞き違い
+
+大井川（2016）の知覚実験では、米語で母音間の /t/ がはじき音 [ɾ] になった音声を、日本語話者が主にラ行またはダ行に対応づけた。文化庁の日本語教育研究協議会には *better* の「ベター／ベラー」、*pudding* の「プリン」という例もある。国立国語研究所は、日本語でもラ行とダ行の混同を観察できると説明している。これらは音声上の根拠で、個別の日本語STT出力で何が発音されたかは特定できない。[大井川の知覚実験](https://www.isca-archive.org/isaph_2016/ooigawa16_isaph.html)・[文化庁の協議記録](https://www.bunka.go.jp/seisaku/kokugo_nihongo/kyoiku/taikai/16_kansai/bunkakai_2.html)・[国立国語研究所の解説](https://kotoba.ninjal.ac.jp/qa/yokuaru/qa-246/)
+
+上記のFLEURSとKotobaの正解文・出力をNFKCでそろえ、中黒と空白を除いてモーラに近いかな単位で比較した。差分に現れた同母音のラ行とダ行・タ行の候補を原文で確認した。次の向きは正解表記からモデル出力への向きを表す。
+
+| 正解の該当部分 → 実際の出力 | 発話とモデル | 観察 |
+|---|---|---|
+| ジャンカルロ・フィジケラ → ジャン・カルド・フィジケラ | fleurs-0602、Whisper large-v3-turbo | フルネームのロ → ド |
+| カルパネド → カルパネロ | fleurs-0220、Qwen3-ASR-0.6B | 選手の姓のみ。ド → ロの逆方向 |
+| リー・シェン・ルーン → ディー・シェン・ルーン | fleurs-0453、Whisper medium | フルネームの先頭でリ → ディ。SenseVoiceSmallも同じ発話で「ディーシェンルーン」と出力 |
+| レアロフィ → デアロフィ | fleurs-0333、Whisper large-v3-turbo | フルネーム末尾のレ → デ。前半にも複数の違いがある |
+| ディーン → リーン | ReazonSpeech `d5e36818c6db1.flac`、Whisper large-v3 | 「さん」の前の呼び名のみ。ディ → リの逆方向 |
+| ラインダンス → ラインランス | ReazonSpeech `d027cb91bb410.flac`、Whisper large-v3 | 一般語のダ → ラ |
+| レスラー → レスター | fleurs-0529、anime-whisper | 一般語のラ → タ |
+
+`fleurs-0453` の anime-whisper 出力「ディ・シェン・ルーン」も、長音の落ちた語頭の回帰例として収録した。かなでフルネームが残る `fleurs-0162`（Whisper large-v3-turbo）と `fleurs-0603`（anime-whisper）も見落としを検証する行として収録した。TSV の `foreign_by_length_mask` は `ForeignRules`・長さ別上限・指定閾値 `2` での期待マスク。語中の「ロ」、末尾の「フィ」などを削った短縮例は別途Goテストで作成し、公開出力の件数から除外した。
+
+フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者は語頭の照合、後者はラ行以外も変わる見落としの検証に使う。タ行については今回の抽出でタ行との置換だけで説明できるフルネームの例を確認できず、資料にとどめた。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
+
+### トゥプアの異表記と発音資料
+
+サモアの独立運動指導者の綴りは **Tupua Tamasese Lealofi III**。FLEURS 日本語の `fleurs-0332`、`0333`、`0334` は正解文が同一の3発話である。Whisper large-v3-turbo の先頭は順に「トゥプア」「トワッパー」「トゥプア」。中央の発話では Whisper large-v3 が「トゥアッパー」、Whisper medium が「トワッパー」と出力した。同じ録音に対する複数モデルの表記なので、話者がどう発音したかや、別の人名での発生率はこの比較から決まらない。[ニュージーランド公文書館](https://www.archives.govt.nz/discover-our-stories/the-rise-of-the-mau-and-the-fall-of-colonial-rule-in-samoa)・[各モデルの出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)
+
+- **トゥ／ト**。文化庁は同じ人名の表記例として「ハチャトゥリヤン／ハチャトリヤン」を挙げる。STTでも JSUT `BASIC5000_3315.wav` で「シャクロヴィートゥイ → シャクロビートイ」があり、ヴィ／ビとトゥ／トの2か所が対応する。[文化庁「外来語の表記」第6項](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)・[JSUTのWhisper large-v3出力](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
+- **プア／プワ**。Whisper large-v3 は `fleurs-0332` と `0334` で「トゥプワ」と出力した。Zuraw・Yu・Orfitelli はサモア語の一部の母音列で /u/ が [w] や [uw] として現れる例を報告する。一方、子音の直後では通常その転写をしなかったと明記している。Tupua の /p/ 直後への適用は実証されておらず、「プワ」と「ワッパー」ではワに対する子音の位置も異なる。[サモア語の音声研究、第8節](https://linguistics.ucla.edu/people/zuraw/dnldpprs/ZurawYuOrfitelli_Samoan_Phonology_2014.pdf)
+- **ッパー**。英語からの借用では、同じ /p/ でも語や音環境によって促音化が異なる（cap の「キャップ」、captain の「キャプテン」）。英語の語末の -er 等をア列の長音で写す慣用もあるが、Tupua は -a で終わる。別の FLEURS 発話 `fleurs-0158` では Whisper large-v3 と turbo が人名以外の「チャッパン」を「チャップアン」と出力した。パ／プアが逆向きに現れた参考例で、この例では「ッ」は両方にある。[Kubozono・Itô・Mester の促音化研究](https://people.ucsc.edu/~ito/papers/2009_kubozono_ito_mester_gemination_CIL18.pdf)・[文化庁「外来語の表記」長音の項](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun06.html)
+
+「トゥ → ト(ワ)」のうちワを伴う別の用例を探すため、FLEURS日本語の7,150出力と、上記のJSUT・ReazonSpeech・Common Voiceの計14,746出力を調べた。正解文と出力をNFKCで正規化し、ひらがなをカタカナにそろえて、正解文に「トゥ」、同じ行の出力に「トワ」を含む行を抽出した。該当したのは `fleurs-0333` の5モデルだけで、どれも同じ録音である。実装ではこの表記対を「トゥ → トワ」「プア → ッパ」として照合する。観測できるのは文字起こしの違いで、音がどう聞こえたかの解釈は仮説である。[FLEURSの発話別出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026/resolve/main/fleurs_outputs.jsonl)
+
+**「ウ」と「ワ」の音声学的な関係。** 米語の発音実験では、母音 [u] と半母音 [w] の区別に、舌や唇の動きのタイミングが強く関わった。標準日本語11話者のMRI研究では、「ウ」と「ワ」の子音で唇の開きに有意差はなく、「ウ」のほうが舌の奥と軟口蓋の間が狭かった。どちらも調音の研究で、「トゥ」「トワ」を聞き違える頻度は測っていない。[Burgdorf・Tilsen（2021）](https://doi.org/10.1016/j.wocn.2021.101073)・[前川（2020）第3.3節](https://icu.repo.nii.ac.jp/record/4799/files/06_Maekawa.pdf)
+
+Tupua の最初の u は t と p の間にあり、サモア語の研究で [w] が典型的に観察された「次が母音」の位置から外れる。次が a なのは p の後の2番目の u である。日本語の文字起こしでも「トゥ」は1モーラ、「トワ」は2モーラで、後者には「ワ」の母音 a がある。この録音で最初の u が w に聞こえたかは、正解文とSTT出力だけでは特定できない。[Zuraw・Yu・Orfitelli（2014）第8節](https://linguistics.ucla.edu/people/zuraw/dnldpprs/ZurawYuOrfitelli_Samoan_Phonology_2014.pdf)
+
 ## 音の対応と重みを検討したライブラリ
 
 Mondegreen（Apache-2.0）の音素対応表には、母音が同じときに比較できる子音 `sh / j` がある。yomiyose では FLEURS の `fleurs-0380` に直接現れた語中の「ジェ／シェ」を、既存のGoの置換規則に加えた。重みは yomiyose の `MedialVoicing` を使う。参照したコミットは `2cf793e2abdced743a8b6552f64ee7097a87b17c`。ソースコードや辞書の転載はない。[Mondegreenの音素対応表](https://github.com/NagaYu/mondegreen/blob/2cf793e2abdced743a8b6552f64ee7097a87b17c/mondegreen/phonetics.py#L221-L229)・[ライセンスと第三者データの記載](https://github.com/NagaYu/mondegreen/blob/2cf793e2abdced743a8b6552f64ee7097a87b17c/LICENSE)
 
-kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b` にある `data/biphone` の音響距離表を、追加候補の比較実験に使用した。Goパッケージに表は同梱していない。たとえば「ビ」「ヴィ」はどちらも同じ子音・母音の組に割り当てられる。yomiyose ではこの差に調整可能な `BV` を使う。[kanasimのカナと音素の対応表](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/src/kanasim/data/biphone/kana2phonome_bi.csv)・[ライセンス](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/LICENSE)・[比較結果](EVALUATION.md#kanasimで選んだ置換候補)
+kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b` にある `data/biphone` の音響距離表を、追加候補の比較実験に使用した。Goパッケージに表は同梱していない。たとえば「ビ」「ヴィ」はどちらも同じ子音・母音の組に割り当てられる。yomiyose ではこの差に調整可能な `BV` を使う。[kanasimのカナと音素の対応表](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/src/kanasim/data/biphone/kana2phonome_bi.csv)・[ライセンス](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/LICENSE)・[比較結果](docs/matching/candidates.md)
 
 ## 規則の参考資料
 
