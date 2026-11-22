@@ -2,6 +2,8 @@
 
 yomiyose は、日本語の音声認識（STT）の文字起こしから、あらかじめ読みを登録した人名を探してマスクする Go ライブラリです。長音・促音の表記揺れや聞き違いを重み付き編集距離で照合します。`Find` は指定した閾値以下の箇所を原文の UTF-8 バイト範囲で返し、`Mask` はその範囲をまとめて置き換えます。
 
+このREADMEでは導入方法、公開API、照合規則と重みを説明します。マスク結果とその再現手順は [EVALUATION.md](EVALUATION.md)、テストデータの出典・利用条件と参考文献は [DATA_SOURCES.md](DATA_SOURCES.md) にまとめています。
+
 Go 1.22 以降で使えます。外部パッケージへの依存はありません。
 
 ```sh
@@ -132,13 +134,6 @@ fmt.Println(m.Mask(text, 0.25, "■")) // 受付に■さん、■さんがい�
 
 v0.1.0 の後に `GlideAfterOU` の既定値を0.25に変更し、`HaAsWa` を追加しました。「エルモア・ジェイムズ → エルモはジェームズ」では直前の「モ」と直後の「ジェ」が一致します。文字起こしの「は」をワと読む経路を加えると、読み全体の距離は0.375です。`Find` と `Mask` では、ひらがな1モーラ分を加えた0.5で氏名全体が一致します。[データの出典と抽出方法](DATA_SOURCES.md)
 
-**規則の参考資料**
-
-- 外国人名を同じ辞書見出しにまとめる際の差異と位置の分類。[国立国語研究所『現代日本語書き言葉均衡コーパス』形態論情報規程集 改定版 §2.5.3](https://repository.ninjal.ac.jp/record/2862/files/LR-CCG-08-03.pdf)
-- 長音の仮名遣いと、ヴィ／ビなどの外来音の対応。[文化庁「現代仮名遣い」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gendaikana/honbun_dai1.html)・[「外来語の表記」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)
-- 日本人の姓のかな表記を分析した近似照合の先行研究。[高橋・梅村「人名のかな表記のゆれに基づく近似文字列照合法」](https://cir.nii.ac.jp/crid/1050564287841082880)
-- 同一人物の日本語表記を確認できる典拠。[Antonio Vivaldi](https://id.ndl.go.jp/auth/ndlna/00527045)・[David McKee](https://id.ndl.go.jp/auth/ndlna/00449504)
-
 ## ライセンス
 
-yomiyose のコードは [MIT License](LICENSE) で利用できます。外部資料から採ったテストデータの出典、抜粋方法、利用条件は [DATA_SOURCES.md](DATA_SOURCES.md) に記載しています。
+Goコードは商用製品にも組み込めます。コードまたはその重要な部分を配布する際は、著作権表示と許諾文を同梱してください。照合には呼び出し側が渡した名前と本文を使います。ソースに含まれるテスト用TSVの再利用条件は出典ごとに異なります。[MIT License](LICENSE)・[テストデータの利用条件](DATA_SOURCES.md#テストデータの利用条件)

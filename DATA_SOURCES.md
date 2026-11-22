@@ -1,5 +1,7 @@
 # テストデータの出典
 
+ここには各データの入手元・抽出方法・利用条件と、規則の設計に参照した文献を記録する。どの名前をどこまでマスクできたかは [EVALUATION.md](EVALUATION.md)、ライブラリの使い方は [README.md](README.md) を参照。
+
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
 | [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
@@ -7,7 +9,13 @@
 | [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人10人、10発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
 | [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話 | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与 |
 
-外部データには各出典の利用条件が適用される。`fleurs_names.tsv` の人名部分は Google の FLEURS と yukobayashi500 の評価結果から抜粋し、マスク期待値を加えた。両配布元のライセンスは [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。Kotoba Technologies の評価結果は、下記の発話IDと人名の表記のみを収録した。
+## テストデータの利用条件
+
+Goモジュールのソース配布物には上記のTSVが含まれる。TSVを読むのはテストで、製品に組み込むGoパッケージは呼び出し側が渡したテキストだけを照合する。音声ファイルの同梱・取得は行っていない。[GoコードのMITライセンス](LICENSE)
+
+- **FLEURS** — `fleurs_names.tsv` は Google の正解文と yukobayashi500 の評価結果から人名部分を抜き出し、マスク期待値を加えた。両配布元の CC BY 4.0 は商用利用も認めている。抜粋を再配布する際は、出典・ライセンス・変更内容の表示を引き継ぐ。[Google FLEURS](https://huggingface.co/datasets/google/fleurs)・[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
+- **Kotoba Technologies の評価結果** — JSUT、Common Voice 8、ReazonSpeech の各発話でどんな表記が観測されたかを、IDと人名部分の短い表記対で記録した。確認したコミットには評価CSV全体の商用再配布を明示するライセンスは見当たらない。文化庁は単なる事実・データやアイデアを参照して利用できると説明している。[参照した版](https://github.com/kotoba-tech/kotoba-whisper/tree/649fe3d1427d9ad6027940e29e7651fd516ea590)・[文化庁の説明](https://www.bunka.go.jp/seisaku/chosakuken/seidokaisetsu/chosakukensha_fumei/)
+- **元の音声・台本** — JSUT は音声の営利利用について配布元への連絡を案内している。台本には出典別のライセンスがある。Mozilla は Common Voice の元データを CC0 と説明している。ReazonSpeech の配布元は日本語音声コーパスの用途を情報解析に限定している。これらは原資料を直接利用するときの条件である。[JSUTの利用条件](https://sites.google.com/site/shinnosuketakamichi/publication/jsut)・[JSUTの原著論文](https://arxiv.org/abs/1711.00354)・[Mozillaの解説](https://assets.mofoprod.net/network/documents/Creating-Community-Driven-Datasets-Report-032023-GIZ-Mozilla.pdf)・[ReazonSpeechの利用条件](https://research.reazon.jp/projects/ReazonSpeech/index.html)
 
 ## 日本人名の発話別STT出力
 
@@ -52,11 +60,18 @@ Mondegreen（Apache-2.0）の音素対応表には、母音が同じときに比
 
 kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b` にある `data/biphone` の音響距離表を、追加候補の比較実験に使用した。Goパッケージに表は同梱していない。たとえば「ビ」「ヴィ」はどちらも同じ子音・母音の組に割り当てられる。yomiyose ではこの差に調整可能な `BV` を使う。[kanasimのカナと音素の対応表](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/src/kanasim/data/biphone/kana2phonome_bi.csv)・[ライセンス](https://github.com/jiroshimaya/kanasim/blob/f067a4e8be10d818b37b8b9f08de933dae01524b/LICENSE)・[比較結果](EVALUATION.md#kanasimで選んだ置換候補)
 
+## 規則の参考資料
+
+- 外国人名を同じ辞書見出しにまとめる際の差異と位置の分類。[国立国語研究所『現代日本語書き言葉均衡コーパス』形態論情報規程集 改定版 §2.5.3](https://repository.ninjal.ac.jp/record/2862/files/LR-CCG-08-03.pdf)
+- 長音の仮名遣いと、ヴィ／ビなどの外来音の対応。[文化庁「現代仮名遣い」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gendaikana/honbun_dai1.html)・[「外来語の表記」](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)
+- 日本人の姓のかな表記を分析した近似照合の先行研究。[高橋・梅村「人名のかな表記のゆれに基づく近似文字列照合法」](https://cir.nii.ac.jp/crid/1050564287841082880)
+- 同一人物の日本語表記を確認できる典拠。[Antonio Vivaldi](https://id.ndl.go.jp/auth/ndlna/00527045)・[David McKee](https://id.ndl.go.jp/auth/ndlna/00449504)
+
 ## 手作りの文章と名前の典拠
 
 `transcripts.tsv` のイシイカオリ、ヤマモトユウスケ、サイトウ／サトウ、語尾の脱落などはライブラリの利用例を起点に作成した。`length-` の人工的な長音挿入や、同姓の別人を含む文、会議録、境界チェックも手作り。国籍やSTTモデルごとの発生頻度を示すデータではない。外国人名について以下の典拠から確認した差を組み込んだ。
 
-本文、登録する向き、マスクすべき人物、期待するコストはテスト用に設定した。和語・外来語の仮名遣いと先行研究は規則を設計するための参考資料として参照した。[READMEの参考資料](README.md)
+本文、登録する向き、マスクすべき人物、期待するコストはテスト用に設定した。和語・外来語の仮名遣いと先行研究は規則を設計するための参考資料として参照した。[規則の参考資料](#規則の参考資料)
 
 - デビ／デービとデビス／デービス。[国立国会図書館の David McKee](https://id.ndl.go.jp/auth/ndlna/00449504)・[国際日本文化研究センターの Jerome Dean Davis](https://sekiei.nichibun.ac.jp/GAI/ja/detail/?gid=GH080003&hid=3509)
 - シェク／シェーク、ディケンズ／ディッケンズ、クリスティ／クリスティー。[Shakespeare](https://id.ndl.go.jp/auth/ndlna/00456207)・[Dickens](https://id.ndl.go.jp/auth/ndlna/00437850)・[Christie](https://id.ndl.go.jp/auth/ndlna/00435977)
@@ -73,4 +88,10 @@ kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b
 
 日本人名に絞って新しく測るための候補には、ELRAの `ELRA-S0228-56` がある。配布元によると日本人名2,000件を200人の話者が発声したコーパスで、利用条件はカタログにある。今回は音声もモデル出力も使用していない。[ELRAのコーパス仕様・利用条件](https://catalogue.elra.info/en-us/repository/browse/ELRA-S0228_56/)
 
-CJKIは公開仕様を調査した段階。[CJKIの調査記録](EVALUATION.md#読みの統計に使える資料)
+## 読みの統計に使える資料
+
+CJKIの日英人名データベース（JEN）は姓と名を別項目で持ち、かな読み、分類、ロケール、頻度を提供する。たとえば日本の姓「一井」の読みは「いちい」で、母音が続く位置が分かる。日本語で表記した中国名のサンプルもあるので、読みの傾向を集計するときはロケールと分類を使う。同社の日英人名データベースを使う場合、同じ読みを持つ漢字表記の数と実際の出現頻度は区別する必要がある。[CJKIの日英人名データベース](https://www.cjk.org/language/ja/data/japanese/proper/japanese-english-database-personal-names/)
+
+利用案は、姓・名の読みから2〜3モーラの並びを集計し、登録されたフルネームの分割候補を内部で比較すること。姓と名の全組み合わせを用意する必要はない。外国人名のカナ読みも対照にして、長音を挿入してよい位置にどれだけ予測力があるかを別の人物で検証できる。STTの誤りやすさを推定するには、実際の文字起こしと正しい読みの対も必要になる。今回はCJKIの公開仕様と用例を確認した。全件データでの学習・評価は未実施で、モデルや統計表の配布条件は個別ライセンスの確認が必要になる。[CJKIのデータライセンス](https://www.cjk.org/language/ja/licensing/)
+
+同社の日本人名異表記データベース（JNV）では、日本語名をローマ字にしたときに「とう」が `tō / tou / too / to / toh` と揺れる例を確認できる。これらはローマ字入力の評価に利用できる。[CJKIの日本人名異表記データベース](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/)
