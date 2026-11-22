@@ -65,19 +65,22 @@ func readCorpus(t *testing.T, path string, fields int) [][]string {
 // Each hypothesis is a verbatim name span from a published ASR run. Keep the
 // carrier fixed to compare edit rules without changing the surrounding text.
 func TestFLEURSNameMasks(t *testing.T) {
-	rows := readCorpus(t, "testdata/fleurs_names.tsv", 7)
+	rows := readCorpus(t, "testdata/fleurs_names.tsv", 8)
 	base := DefaultWeights()
-	length, noGlide := base, base
+	length, noGlide, byLength := base, base, base
 	length.LongInsertion = 1.5
 	noGlide.GlideAfterOU = math.Inf(1)
+	byLength.LimitByMoraCount = true
 	for _, tc := range []struct {
 		label   string
 		column  int
 		weights Weights
 		rules   RuleSet
+		limit   float64
 	}{
-		{"default_mask", 4, base, AllRules}, {"long_mask", 5, length, AllRules},
-		{"no_glide_mask", 6, noGlide, AllRules}, {"foreign_rules", 4, base, ForeignRules},
+		{"default_mask", 4, base, AllRules, 1.5}, {"long_mask", 5, length, AllRules, 1.5},
+		{"no_glide_mask", 6, noGlide, AllRules, 1.5}, {"foreign_rules", 4, base, ForeignRules, 1.5},
+		{"foreign_by_length", 7, byLength, ForeignRules, 2},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			const prefix, suffix = "記録は「", "」です。"
@@ -88,7 +91,7 @@ func TestFLEURSNameMasks(t *testing.T) {
 					t.Fatal(err)
 				}
 				input := prefix + row[3] + suffix
-				got := m.Mask(input, 1.5, "■")
+				got := m.Mask(input, tc.limit, "■")
 				want := row[tc.column]
 				if want == "=" {
 					want = row[3]

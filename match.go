@@ -21,6 +21,8 @@ type Weights struct {
 	FinalLongLoss        float64 // supported length difference at the end of the reading
 	LongInsertion        float64 // other short vowels lengthened in the observation
 	LongDeletion         float64 // other registered long vowels shortened in the observation
+	ForeignLongInsertion float64 // replaces LongInsertion for explicitly scoped ForeignRules
+	ForeignLongDeletion  float64 // replaces LongDeletion for explicitly scoped ForeignRules
 	RepeatedVowelPenalty float64 // extra length-change cost in a run of three consonant-led moras with the same vowel
 	VowelLoss            float64 // ai vs a
 	GlideAfterOU         float64 // medial ア/ワ after a matching o/u mora and before a matching sound
@@ -29,6 +31,8 @@ type Weights struct {
 	KuGemination         float64 // medial ク before a k mora realized as ッ (キクコ -> キッコ)
 	BV                   float64 // corresponding b/v moras
 	TiChi                float64 // ティ/チ
+	TuToWa               float64 // registered トゥ heard as ト or トワ
+	PuaContraction       float64 // registered プア heard as パ or ッパ in one edit
 	KanaSize             float64 // small/full-size vowel in ウィ, ウェ or シェ
 	ShiShu               float64 // シ/シュ in Japanese or foreign names
 	RiRu                 float64 // リ/ル under foreign-name rules
@@ -49,7 +53,8 @@ type Weights struct {
 func DefaultWeights() Weights {
 	return Weights{
 		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 0.75, LongDeletion: 0.75,
-		TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
+		ForeignLongInsertion: 0.5, ForeignLongDeletion: 0.5,
+		TiChi: 0.25, TuToWa: 0.25, PuaContraction: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
@@ -89,8 +94,10 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 	case JapaneseRules:
 		w.FinalLongLoss, w.Geminate, w.BV = off, off, off
 		w.TiChi, w.KanaSize, w.GlideAfterOU = off, off, off
+		w.TuToWa, w.PuaContraction = off, off
 		w.RiRu, w.RD = off, off
 	case ForeignRules:
+		w.LongInsertion, w.LongDeletion = w.ForeignLongInsertion, w.ForeignLongDeletion
 		w.VowelLoss, w.InitialKS, w.KuGemination = off, off, off
 		w.RepeatedVowelPenalty = 0
 	}
@@ -140,6 +147,7 @@ func New(names []Name, w Weights) (*Matcher, error) {
 // set is AllRules. The matcher never guesses a rule set from the spelling.
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
+		w.TuToWa, w.PuaContraction, w.ForeignLongInsertion, w.ForeignLongDeletion,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
 		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
@@ -342,6 +350,9 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	if tiChiPartner[x] == y {
 		cost = math.Min(cost, w.TiChi)
 	}
+	if x == "tu" && y == "to" {
+		cost = math.Min(cost, w.TuToWa)
+	}
 	if shiShuPartner[x] == y {
 		cost = math.Min(cost, w.ShiShu)
 	}
@@ -519,6 +530,15 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			if i > 0 && a[i].sound == second && a[i-1].sound == first {
 				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.KanaSize+script)
 			}
+			if t.sound == "wa" && j > 0 && b[j-1].sound == "to" && a[i].sound == "tu" {
+				curr[i+1] = math.Min(curr[i+1], older[i]+w.TuToWa+previousScript+script)
+			}
+			if t.sound == "pa" && i > 0 && a[i-1].sound == "pu" && a[i].sound == "a" {
+				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.PuaContraction+script)
+				if j > 0 && b[j-1].sound == "^" {
+					curr[i+1] = math.Min(curr[i+1], older[i-1]+w.PuaContraction+previousScript+script)
+				}
+			}
 			if kuGemination && i >= 2 && a[i-1].sound == "ku" && a[i].sound == t.sound && a[i-2].sound == b[j-2].sound {
 				curr[i+1] = math.Min(curr[i+1], older[i-1]+w.KuGemination+previousScript+script)
 			}
@@ -535,7 +555,8 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			if low > limit {
 				canFinishKanaPair := w.KanaSize <= limit && compactKana(b, j) != ""
 				canFinishKuPair := w.KuGemination <= limit && startsKuGemination(b, j)
-				if !canFinishKanaPair && !canFinishKuPair {
+				canFinishPua := w.PuaContraction <= limit && t.sound == "^" && j+1 < len(b) && b[j+1].sound == "pa"
+				if !canFinishKanaPair && !canFinishKuPair && !canFinishPua {
 					break
 				}
 			}
@@ -613,6 +634,13 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 	}
 	if w.TiChi <= limit {
 		add(tiChiPartner[first])
+	}
+	if first == "tu" && w.TuToWa <= limit {
+		add("to")
+	}
+	if first == "pu" && len(form) > 1 && form[1].sound == "a" && w.PuaContraction <= limit {
+		add("pa")
+		add("^")
 	}
 	if w.ShiShu <= limit {
 		add(shiShuPartner[first])
