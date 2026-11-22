@@ -435,7 +435,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			}
 			low = math.Min(low, curr[i+1])
 		}
-		if canDropTail && !(prefix && tailAfterMarker(b, j+1, a[last].sound)) {
+		if canDropTail && (!prefix || !tailAfterMarker(b, j+1, a[last].sound)) {
 			curr[last+1] = math.Min(curr[last+1], curr[last]+w.TailLoss)
 			low = math.Min(low, curr[last+1])
 		}
@@ -453,7 +453,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			// Test each endpoint independently. A rejected two-mora prefix
 			// can still lead to an eligible three-mora match.
 			shorter := min(referenceLength, observedLength)
-			if shorter == 1 && w.ExactSingleMora && !(sameSounds && j+1 == len(a)) {
+			if shorter == 1 && w.ExactSingleMora && (!sameSounds || j+1 != len(a)) {
 				continue
 			}
 			cost := prev[len(a)]

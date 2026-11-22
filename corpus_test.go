@@ -1,6 +1,7 @@
 package yomiyose
 
 import (
+	"bytes"
 	"encoding/csv"
 	"os"
 	"strings"
@@ -46,12 +47,11 @@ func TestTranscriptCorpus(t *testing.T) {
 
 func readCorpus(t *testing.T, path string, fields int) [][]string {
 	t.Helper()
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
-	reader := csv.NewReader(f)
+	reader := csv.NewReader(bytes.NewReader(data))
 	reader.Comma = '\t'
 	reader.FieldsPerRecord = fields
 	rows, err := reader.ReadAll()
