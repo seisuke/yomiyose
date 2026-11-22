@@ -44,8 +44,8 @@ type Weights struct {
 // DefaultWeights returns initial ranking costs, not estimated probabilities.
 func DefaultWeights() Weights {
 	return Weights{
-		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 2, LongDeletion: 1.25,
-		RepeatedVowelPenalty: 2, TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
+		LongLoss: 0.25, FinalLongLoss: 0.125, LongInsertion: 0.75, LongDeletion: 0.75,
+		TiChi: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: 0.25, HaAsWa: 0.125,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, TailLoss: 0.75, HeadLoss: 1.25, Other: 2,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,

@@ -28,8 +28,8 @@ func TestRuleSetDistances(t *testing.T) {
 		{"ヤマザキケント", "ヤマサキケント", .25, .25, .25},
 		{"サイトウミホ", "サトウミホ", .25, .25, 2},
 		{"カトウミホ", "サトウミホ", .5, .5, 2},
-		{"オオノユウスケ", "オノユースケ", .25, .25, 1.25},
-		{"デビットマッキー", "デービットマッキー", .25, 2, .25},
+		{"オオノユウスケ", "オノユースケ", .25, .25, .75},
+		{"デビットマッキー", "デービットマッキー", .25, .75, .25},
 		{"デビットマッキー", "デビトマッキー", .25, 2, .25},
 		{"アントニオヴィバルディ", "アントニオビバルディ", .25, 2, .25},
 		{"ジェームズ・パジェット", "ジェームス・パシェット", .5, 2.25, .5},
@@ -46,12 +46,12 @@ func TestRuleSetDistances(t *testing.T) {
 		{"キム・ミウ", "キム・ムウ", 2, 2, 2},
 		{"マーティンホール", "マーチンホール", .25, 2, .25},
 		{"ウィリアムモリス", "ウイリアムモリス", .25, 4, .25},
-		{"リーエディー", "リーエディ", .125, 1.25, .125},
+		{"リーエディー", "リーエディ", .125, .75, .125},
 		{"レジェップタイイップエルドアン", "レジェップタイイップエルドワン", .5, 2, .5},
 		{"エルモア・ジェイムズ", "エルモはジェームズ", .625, 2, .625},
 		{"オトワユウスケ", "オトはユウスケ", .125, .125, .125},
 		{"オトハユウスケ", "オトワユウスケ", 2, 2, 2},
-		{"オオノデビット", "オノデービット", .5, 2.25, 1.5},
+		{"オオノデビット", "オノデービット", .5, 1, 1},
 		{"キクチユウスケ", "キチユウスケ", 2, 2, 2},
 	} {
 		for scope, want := range []float64{tc.all, tc.japanese, tc.foreign} {
@@ -72,10 +72,10 @@ func TestRuleSetDistances(t *testing.T) {
 	if got := m.Mask(transcript, 1.49, "■"); got != transcript {
 		t.Errorf("tuned MedialVoicing below threshold: %q", got)
 	}
-	w.LongInsertion = .5
+	w.LongInsertion, w.RepeatedVowelPenalty = .5, .25
 	m = mustNew(t, w)
 	if j, f := m.DistanceWithRules("タナカミホ", "ターナカミホ", JapaneseRules),
-		m.DistanceWithRules("タナカミホ", "ターナカミホ", ForeignRules); j != 2 || f != .5 {
+		m.DistanceWithRules("タナカミホ", "ターナカミホ", ForeignRules); j != .75 || f != .5 {
 		t.Errorf("repeated-vowel penalty: Japanese %g, foreign %g", j, f)
 	}
 }
@@ -194,9 +194,9 @@ func TestLongVowelContext(t *testing.T) {
 		short, long string
 		want        float64
 	}{
-		{"tanakamiho", "ta:nakamiho", 2}, {"タナカミホ", "タアナカミホ", 2},
-		{"タナカミホ", "タナーカミホ", 2}, {"タナカミホ", "タナカーミホ", 2},
-		{"ヤマダリク", "ヤーマダリク", 2}, {"イシイトモコ", "イシイトーモコ", 2},
+		{"tanakamiho", "ta:nakamiho", .75}, {"タナカミホ", "タアナカミホ", .75},
+		{"タナカミホ", "タナーカミホ", .75}, {"タナカミホ", "タナカーミホ", .75},
+		{"ヤマダリク", "ヤーマダリク", .75}, {"イシイトモコ", "イシイトーモコ", .75},
 		{"デビットマッキー", "デービットマッキー", .25}, {"デビットマッキー", "デイビットマッキー", .25},
 		{"オノマイ", "オオノマイ", .25}, {"ウィリアムシェクスピア", "ウィリアムシェークスピア", .25},
 		{"ターカタミホ", "タアカタミホ", 0}, // Both readings already have the long vowel.
@@ -281,13 +281,27 @@ func TestLongVowelContextInTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := "ターナカミホさんとデービットマッキーさん。タナカミホさん。"
-	if got := m.Mask(text, 1.5, "X"); got != "ターナカミホさんとXさん。Xさん。" {
+	if got := m.Mask(text, 1.5, "X"); got != "XさんとXさん。Xさん。" {
+		t.Error(got)
+	}
+	if got := m.Mask(text, .749, "X"); got != "ターナカミホさんとXさん。Xさん。" {
 		t.Error(got)
 	}
 	// Bi is outside the registered reading, so it cannot license De / De:.
 	short := mustNew(t, DefaultWeights(), Name{Text: "ヤマダカナデ"})
 	if got := short.Mask("ヤマダカナデービ", .25, "X"); got != "Xービ" {
 		t.Error(got)
+	}
+}
+
+func TestMaskTwoLengthChanges(t *testing.T) {
+	const name, input = "サトウレーナ", "担当はサトレナさん。"
+	m := mustNew(t, DefaultWeights(), Name{Text: name})
+	if got := m.Mask(input, 1.5, "■"); got != "担当は■さん。" {
+		t.Errorf("two missing long vowels: %q", got)
+	}
+	if got := m.Mask(input, 1.49, "■"); got != input {
+		t.Errorf("below the combined cost: %q", got)
 	}
 }
 
@@ -524,14 +538,14 @@ func TestDirectionalLengthCosts(t *testing.T) {
 		short, long  string
 		insert, drop float64
 	}{
-		{"ヨシダアヤ", "ヨーシダアヤ", 2, 1.25}, {"サカケイスケ", "サーカケイスケ", 2, 1.25},
-		{"フジタユスケ", "フジタユースケ", 2, 1.25}, {"ミズノレナ", "ミズノレーナ", 2, 1.25},
-		{"ミズノレナ", "ミズノレイナ", 2, 1.25}, {"サトウレナ", "サトウレーナ", 2, 1.25},
+		{"ヨシダアヤ", "ヨーシダアヤ", .75, .75}, {"サカケイスケ", "サーカケイスケ", .75, .75},
+		{"フジタユスケ", "フジタユースケ", .75, .75}, {"ミズノレナ", "ミズノレーナ", .75, .75},
+		{"ミズノレナ", "ミズノレイナ", .75, .75}, {"サトウレナ", "サトウレーナ", .75, .75},
 		{"サトウデビット", "サトウデービット", .25, .25}, {"devi^tomakki:", "de:vi^tomakki:", .25, .25},
 		{"ニナフェドロフ", "ニーナフェドロフ", .25, .25}, {"ニコマリ", "ニコマリー", .125, .125},
-		{"セオドアトマス", "セオドアトーマス", .25, .25}, {"イトマキコ", "イトーマキコ", 2, 1.25},
+		{"セオドアトマス", "セオドアトーマス", .25, .25}, {"イトマキコ", "イトーマキコ", .75, .75},
 		{"ヤマモトヨハン", "ヤマモトヨーハン", .25, .25},
-		{"マリニコ", "マリーニコ", .25, .25}, {"タナカミホ", "タナーーカミホ", 4, 3.25},
+		{"マリニコ", "マリーニコ", .25, .25}, {"タナカミホ", "タナーーカミホ", 2.75, 2.75},
 	} {
 		if got := m.Distance(tc.short, tc.long); got != tc.insert {
 			t.Errorf("%s -> %s: %g, want %g", tc.short, tc.long, got, tc.insert)
@@ -597,13 +611,10 @@ func TestRelaxedTwoMoraCorpus(t *testing.T) {
 	w.TwoMoraMaxCost = 1.25
 	t.Run("two-mora", func(t *testing.T) { checkTranscriptCorpus(t, w, nil) })
 
-	w.LongInsertion = 1.5
+	w.LongInsertion, w.RepeatedVowelPenalty = 1.5, 2
 	want := map[string]string{
-		"length-yoshida":   "■と■。",
-		"length-yusuke":    "■、■。",
-		"length-saka":      "■、■。",
-		"length-rena":      "■さん、■さん。",
-		"joined-expansion": "■さん。",
+		"length-tanaka":       "ターナカミホ、タナーカミホ、■。",
+		"joined-no-expansion": "ヤマモトヨーシコさん。",
 	}
-	t.Run("including-lengthening", func(t *testing.T) { checkTranscriptCorpus(t, w, want) })
+	t.Run("higher-insertion-cost", func(t *testing.T) { checkTranscriptCorpus(t, w, want) })
 }
