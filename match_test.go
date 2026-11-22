@@ -148,12 +148,16 @@ func TestRDCostAndContext(t *testing.T) {
 	if got := m.Mask(text, .74, "■"); got != text {
 		t.Errorf("mask below threshold: %q", got)
 	}
-	// The initial vowel length also changed, so the two following moras do not match.
-	if got := m.Distance(name, "ディ・シェン・ルーン"); got != w.Other+w.LongDeletion {
-		t.Errorf("RD without matching context: got %g", got)
+	if got := m.Distance(name, "ディ・シェン・ルーン"); got != w.RD+w.LongDeletion {
+		t.Errorf("RD with a missing length mark: got %g", got)
 	}
 	w.RD = math.Inf(1)
-	if got := mustNew(t, w, Name{Text: name}).Mask(text, .75, "■"); got != text {
+	disabled := mustNew(t, w, Name{Text: name})
+	const differentNeighbor = "ディ・セン・ルーン"
+	if got, want := m.Distance(name, differentNeighbor), disabled.Distance(name, differentNeighbor); got != want {
+		t.Errorf("RD with a mismatched following mora: got %g, want %g", got, want)
+	}
+	if got := disabled.Mask(text, .75, "■"); got != text {
 		t.Errorf("disabled RD: %q", got)
 	}
 	w.RD = -1

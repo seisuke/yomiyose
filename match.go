@@ -293,6 +293,13 @@ func matchingRDContext(a, b []unit, i, j int) bool {
 	if len(a) < 3 {
 		return false
 	}
+	// A missing length mark after initial リ/ディ still leaves two following
+	// moras to check. The alignment charges the deletion separately.
+	if i == 0 && j == 0 && (a[0].sound == "ri" || a[0].sound == "di") && len(a) >= 4 && a[1].sound == ":" &&
+		j+2 < len(b) && phonetic(a[2].sound) && phonetic(a[3].sound) &&
+		a[2].sound == b[j+1].sound && a[3].sound == b[j+2].sound {
+		return true
+	}
 	start := min(max(0, i-1), len(a)-3)
 	observed := j - (i - start)
 	if observed < 0 || observed+3 > len(b) {
