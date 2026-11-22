@@ -55,6 +55,39 @@ type Name struct {
 	Readings []string
 }
 
+// RuleSet selects which name-specific rules to use alongside the common rules.
+type RuleSet uint8
+
+const (
+	AllRules      RuleSet = iota // both groups, including for mixed or unknown readings
+	JapaneseRules                // rules based on Japanese name examples
+	ForeignRules                 // rules based on foreign names written in Japanese
+)
+
+// ScopedName applies Rules to the primary reading and all its aliases.
+type ScopedName struct {
+	Name
+	Rules RuleSet
+}
+
+type ruleWeights struct {
+	Weights
+	scope RuleSet
+}
+
+func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
+	off := math.Inf(1)
+	switch scope {
+	case JapaneseRules:
+		w.FinalLongLoss, w.Geminate, w.BV = off, off, off
+		w.TiChi, w.KanaSize, w.GlideAfterOU = off, off, off
+	case ForeignRules:
+		w.VowelLoss, w.InitialKS = off, off
+		w.RepeatedVowelPenalty = 0
+	}
+	return ruleWeights{Weights: w, scope: scope}
+}
+
 // Match identifies text[Start:End] in the original UTF-8 input.
 type Match struct {
 	Name       string
@@ -66,26 +99,37 @@ type Match struct {
 type entry struct {
 	text  string
 	forms [][]unit
+	rules RuleSet
 }
 
 // Matcher holds compiled name readings and their comparison weights.
 type Matcher struct {
 	names []entry
-	w     Weights
+	rules [ForeignRules + 1]ruleWeights
 }
 
 // NewReadings compiles kana or romaji readings, one per name. Match.Name is
 // the original registered reading, and Match.NameIndex is its index in readings.
 func NewReadings(readings []string, w Weights) (*Matcher, error) {
-	names := make([]Name, len(readings))
+	names := make([]ScopedName, len(readings))
 	for i, reading := range readings {
 		names[i].Text = reading
 	}
-	return New(names, w)
+	return NewScoped(names, w)
 }
 
-// New compiles the name list. Weights are copied and the input slices can be reused.
+// New compiles the name list with AllRules. Weights are copied and the input slices can be reused.
 func New(names []Name, w Weights) (*Matcher, error) {
+	scoped := make([]ScopedName, len(names))
+	for i, name := range names {
+		scoped[i].Name = name
+	}
+	return NewScoped(scoped, w)
+}
+
+// NewScoped compiles a list with an explicit rule set per name. The zero rule
+// set is AllRules. The matcher never guesses a rule set from the spelling.
+func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.Geminate,
 		w.BV, w.MedialVoicing, w.InitialKS, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
@@ -93,9 +137,15 @@ func New(names []Name, w Weights) (*Matcher, error) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
 	}
-	m := &Matcher{w: w}
+	m := &Matcher{names: make([]entry, 0, len(names))}
+	for scope := range m.rules {
+		m.rules[scope] = w.forRuleSet(RuleSet(scope))
+	}
 	for index, name := range names {
-		e := entry{text: name.Text}
+		if name.Rules > ForeignRules {
+			return nil, fmt.Errorf("yomiyose: unknown rule set %d at index %d", name.Rules, index)
+		}
+		e := entry{text: name.Text, rules: name.Rules}
 		for _, reading := range append([]string{name.Text}, name.Readings...) {
 			u := tokenize(strings.TrimSpace(reading))
 			if len(u) == 0 {
@@ -146,7 +196,7 @@ func inRepeatedVowelRun(left, right []unit) bool {
 
 // before and after are parts of the registered reading. Look only at that
 // reading so that surrounding prose cannot enable a discounted edit.
-func (w Weights) lengthCost(before, after []unit, deletion bool) float64 {
+func (w *ruleWeights) lengthCost(before, after []unit, deletion bool) float64 {
 	prev := before[len(before)-1].sound
 	cost := w.LongInsertion
 	if deletion {
@@ -155,8 +205,11 @@ func (w Weights) lengthCost(before, after []unit, deletion bool) float64 {
 	if w.RepeatedVowelPenalty != 0 && inRepeatedVowelRun(before, after) {
 		cost += w.RepeatedVowelPenalty
 	}
-	if prev == "o" && len(after) > 0 && after[0].sound == "no" {
+	if w.scope != ForeignRules && prev == "o" && len(after) > 0 && after[0].sound == "no" {
 		cost = math.Min(cost, w.LongLoss)
+	}
+	if w.scope == JapaneseRules {
+		return cost
 	}
 	afterMari := prev == "ri" && len(before) >= 2 && before[len(before)-2].sound == "ma"
 	beforeMasu := prev == "to" && len(after) >= 2 && after[0].sound == "ma" && after[1].sound == "su"
@@ -176,7 +229,7 @@ var foreignLengthBefore = map[[2]string]bool{
 
 // gap scores omitting u[i]. The matching other-side prefix and suffix give
 // context; e.g., ai/a must keep the preceding a on both sides of the alignment.
-func (w Weights) gap(u []unit, i int, other []unit, end int, reference bool) float64 {
+func (w *ruleWeights) gap(u []unit, i int, other []unit, end int, reference bool) float64 {
 	s := u[i].sound
 	if !phonetic(s) {
 		return math.Inf(1)
@@ -223,7 +276,7 @@ func phonetic(s string) bool {
 	return len(s) > 0 && (s[0] >= 'a' && s[0] <= 'z' || s == "^" || s == ":")
 }
 
-func (w Weights) substitution(a, b []unit, i, j int) float64 {
+func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	x, y := a[i].sound, b[j].sound
 	if x == y {
 		return 0
@@ -252,7 +305,7 @@ func (w Weights) substitution(a, b []unit, i, j int) float64 {
 	if tiChiPartner[x] == y {
 		cost = math.Min(cost, w.TiChi)
 	}
-	if i > 0 && j > 0 && voicingPartner[x] == y {
+	if i > 0 && j > 0 && (voicingPartner[x] == y || w.scope != JapaneseRules && foreignVoicingPartner[x] == y) {
 		cost = math.Min(cost, w.MedialVoicing)
 	}
 	if (x == "a" && y == "wa" || x == "wa" && y == "a") &&
@@ -279,6 +332,7 @@ func partners(pairs string) map[string]string {
 var bvPartner = partners("ba/va bi/vi bu/vu be/ve bo/vo byu/vyu")
 var tiChiPartner = partners("ti/chi")
 var voicingPartner = partners("ka/ga ki/gi ku/gu ke/ge ko/go sa/za shi/ji su/zu se/ze so/zo ta/da te/de to/do ha/ba hi/bi fu/bu he/be ho/bo")
+var foreignVoicingPartner = partners("je/she")
 var ksPartner = partners("ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho")
 
 // One compact mora aligns to both sounds of its full-size spelling in one edit.
@@ -337,7 +391,7 @@ func tailAfterMarker(b []unit, end int, last string) bool {
 // align compares one name to an observation beginning at a fixed position.
 // In prefix mode it remembers the cheapest endpoint and stops as soon as all
 // live paths cost more. Future edits have nonnegative costs.
-func (w Weights) align(a, b []unit, rows []float64, limit float64, prefix, omitHead bool) (int, float64) {
+func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, omitHead bool) (int, float64) {
 	width := len(a) + 1
 	older, prev, curr := rows[:width], rows[width:2*width], rows[2*width:]
 	prev[0] = 0
@@ -417,9 +471,18 @@ func (w Weights) align(a, b []unit, rows []float64, limit float64, prefix, omitH
 	return len(b), prev[len(a)]
 }
 
-// Distance is the phonetic cost of a whole reference and observation. It omits
+// Distance is the AllRules phonetic cost of a whole reference and observation. It omits
 // search limits and the hiragana penalty used by Find. Some edits are directional.
 func (m *Matcher) Distance(reference, observed string) float64 {
+	return m.DistanceWithRules(reference, observed, AllRules)
+}
+
+// DistanceWithRules compares two whole readings with the specified rule set.
+// An unknown set or unsupported separator gives positive infinity.
+func (m *Matcher) DistanceWithRules(reference, observed string, rules RuleSet) float64 {
+	if rules > ForeignRules {
+		return math.Inf(1)
+	}
 	a, b := tokenize(reference), tokenize(observed)
 	for _, units := range [][]unit{a, b} {
 		for _, t := range units {
@@ -428,7 +491,7 @@ func (m *Matcher) Distance(reference, observed string) float64 {
 			}
 		}
 	}
-	_, cost := m.w.align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
+	_, cost := m.rules[rules].align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
 	return cost
 }
 
@@ -480,7 +543,7 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 	// Bytes are marked only after all candidates at the same cost were considered.
 	occupied := make([]bool, len(text))
 	for index, name := range m.names {
-		w := &m.w
+		w := &m.rules[name.rules]
 		var hits []Match
 		for _, form := range name.forms {
 			rows := make([]float64, 3*(len(form)+1))

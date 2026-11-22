@@ -16,6 +16,98 @@ func mustNew(t *testing.T, w Weights, names ...Name) *Matcher {
 	return m
 }
 
+func TestRuleSetDistances(t *testing.T) {
+	w := DefaultWeights()
+	w.GlideAfterOU = .5
+	m := mustNew(t, w)
+	for _, tc := range []struct {
+		ref, obs               string
+		all, japanese, foreign float64
+	}{
+		{"イシイカオリ", "イシーカオリ", 0, 0, 0},
+		{"ヤマザキケント", "ヤマサキケント", .25, .25, .25},
+		{"サイトウミホ", "サトウミホ", .25, .25, 2},
+		{"カトウミホ", "サトウミホ", .5, .5, 2},
+		{"オオノユウスケ", "オノユースケ", .25, .25, 1.25},
+		{"デビットマッキー", "デービットマッキー", .25, 2, .25},
+		{"デビットマッキー", "デビトマッキー", .25, 2, .25},
+		{"アントニオヴィバルディ", "アントニオビバルディ", .25, 2, .25},
+		{"ジェームズ・パジェット", "ジェームス・パシェット", .5, 2.25, .5},
+		{"ジェームス・パシェット", "ジェームズ・パジェット", .5, 2.25, .5},
+		{"ジェームズ・パジェット", "シェームズ・パジェット", 2, 2, 2},
+		{"マーティンホール", "マーチンホール", .25, 2, .25},
+		{"ウィリアムモリス", "ウイリアムモリス", .25, 4, .25},
+		{"リーエディー", "リーエディ", .125, 1.25, .125},
+		{"レジェップタイイップエルドアン", "レジェップタイイップエルドワン", .5, 2, .5},
+		{"オオノデビット", "オノデービット", .5, 2.25, 1.5},
+		{"キクチユウスケ", "キチユウスケ", 2, 2, 2},
+	} {
+		for scope, want := range []float64{tc.all, tc.japanese, tc.foreign} {
+			if got := m.DistanceWithRules(tc.ref, tc.obs, RuleSet(scope)); got != want {
+				t.Errorf("rules %d: %s -> %s = %g, want %g", scope, tc.ref, tc.obs, got, want)
+			}
+		}
+		if got := m.Distance(tc.ref, tc.obs); got != tc.all {
+			t.Errorf("Distance(%s, %s) = %g, want %g", tc.ref, tc.obs, got, tc.all)
+		}
+	}
+	w.MedialVoicing = .75
+	m = mustNew(t, w, Name{Text: "ジェームズ・パジェット"})
+	const transcript = "受付はジェームス・パシェットさんです。"
+	if got := m.Mask(transcript, 1.5, "■"); got != "受付は■さんです。" {
+		t.Errorf("tuned MedialVoicing at threshold: %q", got)
+	}
+	if got := m.Mask(transcript, 1.49, "■"); got != transcript {
+		t.Errorf("tuned MedialVoicing below threshold: %q", got)
+	}
+	w.LongInsertion = .5
+	m = mustNew(t, w)
+	if j, f := m.DistanceWithRules("タナカミホ", "ターナカミホ", JapaneseRules),
+		m.DistanceWithRules("タナカミホ", "ターナカミホ", ForeignRules); j != 2 || f != .5 {
+		t.Errorf("repeated-vowel penalty: Japanese %g, foreign %g", j, f)
+	}
+}
+
+func TestScopedFindAndMask(t *testing.T) {
+	// Register each name twice to check that candidates at the same byte
+	// offset use the intended rule set, including for aliases.
+	jp := Name{Text: "カトウミホ"}
+	foreign := Name{Text: "ウィリアムモリス", Readings: []string{"ウィリアムモーリス"}}
+	m, err := NewScoped([]ScopedName{
+		{Name: jp, Rules: JapaneseRules}, {Name: jp, Rules: ForeignRules},
+		{Name: foreign, Rules: JapaneseRules}, {Name: foreign, Rules: ForeignRules},
+		{Name: Name{Text: "オオノデビット"}},
+	}, DefaultWeights())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := "受付でサトウミホさん、ウイリアム・モーリスさん、オノデービットさんをお呼びします。"
+	want := []struct {
+		index int
+		text  string
+		cost  float64
+	}{{0, "サトウミホ", .5}, {3, "ウイリアム・モーリス", .25}, {4, "オノデービット", .5}}
+	hits := m.Find(input, .5)
+	if len(hits) != len(want) {
+		t.Fatalf("Find returned %+v, want %d hits", hits, len(want))
+	}
+	for i, hit := range hits {
+		if hit.NameIndex != want[i].index || input[hit.Start:hit.End] != want[i].text || hit.Cost != want[i].cost {
+			t.Errorf("unexpected hit %+v for %q", hit, input[hit.Start:hit.End])
+		}
+	}
+	if got := m.Mask(input, .5, "■"); got != "受付で■さん、■さん、■さんをお呼びします。" {
+		t.Errorf("Mask = %q", got)
+	}
+	const invalid RuleSet = 255
+	if _, err := NewScoped([]ScopedName{{Name: jp, Rules: invalid}}, DefaultWeights()); err == nil {
+		t.Error("NewScoped accepted unknown rule set")
+	}
+	if got := m.DistanceWithRules("イシイカオリ", "イシーカオリ", invalid); !math.IsInf(got, 1) {
+		t.Errorf("unknown rule set gave distance %g", got)
+	}
+}
+
 func TestPhoneticRules(t *testing.T) {
 	m := mustNew(t, DefaultWeights())
 	for _, tc := range []struct {
