@@ -109,6 +109,23 @@ func TestFLEURSNameMasks(t *testing.T) {
 	}
 }
 
+func TestKotobaKanaNameMasks(t *testing.T) {
+	const prefix, suffix = "記録は「", "」です。"
+	rows := readCorpus(t, "testdata/kotoba_kana_names.tsv", 5)
+	for _, row := range rows[1:] {
+		t.Run(row[0]+"/"+row[1], func(t *testing.T) {
+			m := mustNew(t, DefaultWeights(), Name{Text: row[2]})
+			want := row[4]
+			if want == "=" {
+				want = row[3]
+			}
+			if got := m.Mask(prefix+row[3]+suffix, 1.5, "■"); got != prefix+want+suffix {
+				t.Errorf("registered %q, observed %q: got %q, want %q", row[2], row[3], got, prefix+want+suffix)
+			}
+		})
+	}
+}
+
 func TestJapaneseASRReadingExamples(t *testing.T) {
 	rows := readCorpus(t, "testdata/japanese_asr_names.tsv", 7)
 	for _, row := range rows[1:] {

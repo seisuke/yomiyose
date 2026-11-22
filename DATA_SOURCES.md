@@ -4,6 +4,7 @@
 |---|---|---|
 | [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
 | [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人10人、12発話 | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
+| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人10人、10発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
 | [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話 | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与 |
 
 ## 日本人名の発話別STT出力
@@ -26,6 +27,12 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 これらの資料の観測対象は人の発音。GPT Liveがカタカナで確定したフルネームの欠落例は今回確認できなかった。上記の件数はSTT回帰テストの分母に含めていない。`VowelLoss` の0.25は利用例「サイトウ／サトウ」用の設定値で、この発話研究から推定した重みではない。
 
 ## 外国人名の発話別STT出力
+
+### Kotoba Technologies の評価結果
+
+JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpeech test から5発話を選んだ。上記の固定コミットの各CSVで、`reference_raw` と `prediction_raw` に含まれる人物名の範囲を目視で対応付けた。`dataset` と `utterance` で元の行を特定できる。表記が一致する対照例、中黒の違い、ひらがなの混入や音の置換を含め、読みは補っていない。`expected_mask` の `=` は出力に名前がそのまま残ることを表す。
+
+### FLEURS 日本語
 
 音声と正解文の元データはGoogleのFLEURS日本語テストセット（CC BY 4.0）。認識結果は `yukobayashi500/ja-asr-leaderboard-2026` の `fleurs_outputs.jsonl` を使った。このファイルには読み上げ650発話に対する11モデル、計7,150行の出力がある。使用ファイルのSHA-256は `7c566d09af0ef0dfa3f36faea08e031ad974b452c8a8cd4bd2b2d6dbd4f7f46e`。[Google FLEURS](https://huggingface.co/datasets/google/fleurs)・[発話別結果の配布元](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[取得したJSONL](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026/resolve/main/fleurs_outputs.jsonl)
 
