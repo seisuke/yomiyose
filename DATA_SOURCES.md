@@ -5,7 +5,7 @@
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
 | [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
-| [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人10人、12発話 | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
+| [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人10人、16出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
 | [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人10人、10発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
 | [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話 | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与 |
 
@@ -52,7 +52,7 @@ JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpe
 
 音声と正解文の元データはGoogleのFLEURS日本語テストセット（CC BY 4.0）。認識結果は `yukobayashi500/ja-asr-leaderboard-2026` の `fleurs_outputs.jsonl` を使った。このファイルには読み上げ650発話に対する11モデル、計7,150行の出力がある。使用ファイルのSHA-256は `7c566d09af0ef0dfa3f36faea08e031ad974b452c8a8cd4bd2b2d6dbd4f7f46e`。[Google FLEURS](https://huggingface.co/datasets/google/fleurs)・[発話別結果の配布元](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[取得したJSONL](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026/resolve/main/fleurs_outputs.jsonl)
 
-比較できるフルネームがあり、既存の規則で拾える例と取りこぼす例を含む12行を選んだ。`utterance` は配布元が付けた `id`、`model` は同じ行にあるモデル識別子。各行の登録名は `reference`、観測名は `hypothesis` の部分文字列と照合して確認した。含まれるモデルはWhisper large-v3-turbo、large-v3、medium、Kotoba-Whisper v2.0。周囲の文だけをテスト用に統一した。マスク期待値の `=` は観測名がそのまま残ることを示す。音声の聞き直し、独立の話者数の確認、この12例からの発生率の推定は行っていない。
+比較できるフルネームがあり、既存の規則で拾える例と取りこぼす例を含む12行を選んだ。`utterance` は配布元が付けた `id`、`model` は同じ行にあるモデル識別子。各行の登録名は `reference`、観測名は `hypothesis` の部分文字列と照合して確認した。当初の12行はWhisper large-v3-turbo、large-v3、medium、Kotoba-Whisper v2.0の出力。後に、同じ10人を7,150出力の全文で照合し、長音コストの変更でマスク結果が変わった4行を追記した。いずれも同じJSONLにある別モデルの出力。周囲の文だけをテスト用に統一した。マスク期待値の `=` は観測名がそのまま残ることを示す。音声の聞き直し、独立の話者数の確認、この標本からの発生率の推定は行っていない。
 
 ## 音の対応と重みを検討したライブラリ
 
