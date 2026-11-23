@@ -1,8 +1,3 @@
-source	utterance	reference_raw	prediction_raw	reference_reading	assumed_output_reading	expected_reading_mask
-JSUT	BASIC5000_0925.wav	野口英世	野口秀夫	ノグチヒデヨ	ノグチヒデオ	■オ
-JSUT	BASIC5000_1664.wav	三島由紀夫	三島幸男	-	-	-
-JSUT	BASIC5000_2285.wav	佐々木禎子	佐々木定子	-	-	-
-ReazonSpeech	e52b25f09728b.flac	山崎賢人	山崎健太	ヤマザキケント	ヤマザキケンタ	■タ
-ReazonSpeech	ff8b1f28eb0b7.flac	橋本英也	橋本英	-	-	-
-ReazonSpeech	47e4f07ccd760.flac	丘みどり	岡緑	-	-	-
-CommonVoice8	common_voice_ja_20964452.mp3	長嶋茂雄	長崎市議	-	-	-
+source	utterance	reference_reading	assumed_output_reading	expected_reading_mask
+JSUT	BASIC5000_0925.wav	ノグチヒデヨ	ノグチヒデオ	■オ
+ReazonSpeech	e52b25f09728b.flac	ヤマザキケント	ヤマザキケンタ	■タ

@@ -4,12 +4,13 @@
 
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
-| [transcripts.tsv](testdata/transcripts.tsv) | 63文、必須のフルネーム70か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
+| [japanese_full_names.tsv](testdata/japanese_full_names.tsv) | 登録読み94種類、観測表記102通り | 日本人の姓と名を組み合わせて作ったかな表記の回帰例 |
+| [transcripts.tsv](testdata/transcripts.tsv) | 65文、必須のフルネーム70か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
 | [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人11人、21出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
-| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
+| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、正解名と認識結果から人名を抜粋しカタカナ化 |
 | [korean_asr_names.tsv](testdata/korean_asr_names.tsv) | 韓国人14人、16発話 | 日本語放送の字幕と、同じ発話に対するWhisper large-v3の出力を照合。氏名の範囲を抜粋 |
 | [korean_name_spellings.tsv](testdata/korean_name_spellings.tsv) | 韓国人3人、4組のかな表記（参考資料） | 日本語の音楽・映画資料、報道に載った同一人物の表記を対にして記録 |
-| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人7人、7発話（原表記の参考資料） | 日本語音声に対する正解文と実際のSTT出力から人物に対応する部分を抜粋。別列に2件のテスト用の読みを付与。公開STTのかな氏名のマスク性能集計からは全7件を除外 |
+| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人2人、2発話を参照した補助テスト | 漢字で出力された氏名に人手でかなの読みを仮定。公開STTのかな氏名のマスク性能集計からは除外 |
 
 ## テストデータの利用条件
 
@@ -22,11 +23,14 @@ Goモジュールのソース配布物には上記のTSVが含まれる。TSVを
 
 ## 日本人名の発話別STT出力
 
-Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-v3` のCSVを使用した。配布元のコミットは `649fe3d1427d9ad6027940e29e7651fd516ea590`。参照した行数はJSUT basic5000が5,000、ReazonSpeech testが5,263、Common Voice 8日本語が4,483。各CSVの `id` をテストデータの `utterance` に記録した。[JSUTの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[ReazonSpeechの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[Common Voice 8の発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.common_voice_8_0.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
+Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-v3` のCSVを使用した。配布元のコミットは `649fe3d1427d9ad6027940e29e7651fd516ea590`。参照した行数はJSUT basic5000が5,000、ReazonSpeech testが5,263、Common Voice 8日本語が4,483。採用した発話のCSVの `id` をテストデータの `utterance` に記録した。[JSUTの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[ReazonSpeechの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[Common Voice 8の発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.common_voice_8_0.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
 
-`reference_raw` は配布元の正解文、`prediction_raw` は同じ発話のモデル出力に含まれる表記そのままの抜粋。たとえばReazonSpeechの `e52b25f09728b.flac` では正解文に「山崎賢人」、出力に「山崎健太」がある。Common Voiceの `common_voice_ja_20964452.mp3` は「長嶋茂雄 → 長崎市議」。姓名を確認でき、出力と比較できる箇所を目視で選んだ。発生割合を推定する無作為抽出ではない。
+次の2発話では出力に漢字がある。読みの末尾が変わった場合のマスク範囲をテストするため、登録読みと出力の読みを人手で付けた。元のCSVの表記と、テストで仮定した読みの対応を示す。[かなの入力と期待マスク](testdata/japanese_asr_names.tsv)・[山﨑賢人の公式プロフィール](https://www.stardust.co.jp/talent/section2/yamazakikento/)
 
-かな照合を試す2行のみ、`reference_reading` と `assumed_output_reading` を人手で付けた。たとえば「健太」に「ケンタ」という読みを仮定した。`expected_reading_mask` はその想定でかなの文を渡した結果。`-` は原表記だけを記録した行。「長崎市議」は人名が一般の語句に置き換わった出力のため、カタカナ人名の揺れの評価から除外した。[山﨑賢人の公式プロフィール](https://www.stardust.co.jp/talent/section2/yamazakikento/)
+| 発話ID | 正解文の表記 → Whisperの表記 | 登録読み → テストで仮定した読み |
+|---|---|---|
+| `BASIC5000_0925.wav` | 野口英世 → 野口秀夫 | ノグチヒデヨ → ノグチヒデオ |
+| `e52b25f09728b.flac` | 山崎賢人 → 山崎健太 | ヤマザキケント → ヤマザキケンタ |
 
 ## 日本語の音が弱まる・落ちる条件を調べた音声資料
 
@@ -41,9 +45,9 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 
 ### 日本人の姓にあるハとワ
 
-姓「音羽」には「おとは」「おとわ」の両方が収録されている。浅井淳（2014）は、電話帳を使って「葉」「羽」などが姓末に来る場合の読みを集計し、山葉・稲葉・常葉の例を挙げている。「山葉寅楠」はヤマハの公式資料でも「やまはとらくす」と読まれている。これらは姓として定着した読みを示す資料。今回調べた範囲では、同じ人が姓から名まで続けて発音したとき、姓末のハがワまたはアとして転記された日本人フルネームの発話対は確認できなかった。[浅井（2014）§2.3–2.4](https://repository.ninjal.ac.jp/record/532/files/papers0702.pdf)・[日本姓氏語源辞典「音羽」](https://name-power.net/fn/音羽.html)・[ヤマハの創業者資料](https://archive.yamaha.com/ja/news_release/2019/19070801/)
+姓「音羽」には「オトハ」「オトワ」の両方が収録されている。浅井淳（2014）は、電話帳を使って「葉」「羽」などが姓末に来る場合の読みを集計し、山葉・稲葉・常葉の例を挙げている。「山葉寅楠」はヤマハの公式資料でも「ヤマハトラクス」と読まれている。これらは姓として定着した読みを示す資料。今回調べた範囲では、同じ人が姓から名まで続けて発音したとき、姓末のハがワまたはアとして転記された日本人フルネームの発話対は確認できなかった。[浅井（2014）§2.3–2.4](https://repository.ninjal.ac.jp/record/532/files/papers0702.pdf)・[日本姓氏語源辞典「音羽」](https://name-power.net/fn/音羽.html)・[ヤマハの創業者資料](https://archive.yamaha.com/ja/news_release/2019/19070801/)
 
-テストの「オトワユウスケ → オトはユウスケ」は、登録したワに対応する位置にひらがなの「は」が出たと仮定した日本人名の例。Whisperで実測した「エルモア・ジェイムズ → エルモはジェームズ」とは別に検証している。
+「オトワユウスケ → オトハユウスケ」は仮定した日本人名の例。Whisperで観測した外国人名の例は、カタカナに統一すると「エルモア・ジェイムズ → エルモハジェームズ」となる。
 
 ### 日本人名の資料をどこに反映したか
 
@@ -54,15 +58,15 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 | 荒井（1999）の母音脱落と促音化 | 「聞くこと → きっこと」をもとに、日本人名向けの `KuGemination` を実装。手作りの「タナカキクコ → タナカキッコ」で距離 `0.5` とマスク範囲を検証した。「と思って」の連続母音に関しては、長音の脱落で表せる場合を既存規則で扱い、発話の持続時間は入力に使っていない。 |
 | 前川の「キクチ」と Hara の姓名境界の母音 | キクチの無声化率から仮名「ク」が丸ごと消える率は求められず、「キクチユウスケ → キチユウスケ」は通常の語中脱落（`MedialLoss = 1`）としてテスト。Hara が測ったのは姓名境界の母音の持続時間。姓と名を分割せず読みを受け取る本ライブラリには、境界専用の母音脱落規則はない。 |
 | CSJの長母音の短呼・文化庁の仮名遣い | 「サトウレーナ → サトウレナ」は `LongDeletion` で `0.75`、「サトウミホ → サトーミホ」は `OuSpelling` で `0`。CSJの語頭・語中・語末別の発生率を重みとして用いる処理はない。 |
-| 浅井の姓末ハ／ワ・高橋・梅村の姓のかな異表記 | 「オトワユウスケ → オトはユウスケ」には `HaAsWa` を使う。「オトハユウスケ → オトワユウスケ」は通常の置換で距離 `1` で、姓に定着した異読を一律に置換する規則はない。語中の清濁は `MedialVoicing` で扱う。高橋・梅村の姓別の正規化規則群は取り込んでいない。[高橋・梅村の研究](https://ipsj.ixsq.nii.ac.jp/records/13848) |
-| 日本人名のWhisper出力7件 | 「ケント → ケンタ」「ヒデヨ → ヒデオ」の2件は人手でかなを仮定し、末尾1文字を残す部分マスクを検証。残る5件は原表記を記録した。漢字の読みの推定と一般語への置き換わりは、かな照合の評価に含めていない。[7件の原表記と評価対象](testdata/japanese_asr_names.tsv) |
+| 浅井の姓末ハ／ワ・高橋・梅村の姓のかな異表記 | `HaAsWa` は本文のハがひらがなで書かれた場合の規則。「オトハユウスケ → オトワユウスケ」は通常の置換で距離 `1` で、姓に定着した異読を一律に置換する規則はない。語中の清濁は `MedialVoicing` で扱う。高橋・梅村の姓別の正規化規則群は取り込んでいない。[高橋・梅村の研究](https://ipsj.ixsq.nii.ac.jp/records/13848) |
+| 日本人名のWhisper出力を参照した補助例 | 「ケント → ケンタ」「ヒデヨ → ヒデオ」の読みを仮定し、末尾1文字を残す部分マスクを検証。[2発話の原表記と読み](#日本人名の発話別stt出力) |
 | CJKI の JEN・JNV、ELRA の人名音声 | JEN の姓名頻度による分類と ELRA 音声での評価は未実施。JNV の公開例には部分的な対応がある。「サトウミホ」と `satoumiho / satoomiho / satomiho` の距離は順に `0 / 0 / 0.75`。`satōmiho` は全体照合の対象外で、`satohmiho` は通常の置換で距離 `1`。両表記を長音として正規化する規則は未実装。撥音の後に母音が続く「ケンイチ」に対する `kenichi / ken’ichi` も正規化していない。[CJKI の公開例](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/) |
 
 ## 外国人名の発話別STT出力
 
 ### Kotoba Technologies の評価結果
 
-JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpeech test から6発話を選んだ。上記の固定コミットの各CSVで、`reference_raw` と `prediction_raw` に含まれる人物名の範囲を目視で対応付けた。`dataset` と `utterance` で元の行を特定できる。表記が一致する対照例、中黒の違い、ひらがなの混入や音の置換を含め、読みは補っていない。`expected_mask` の `=` は出力に名前がそのまま残ることを表す。
+JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpeech test から6発話を選んだ。上記の固定コミットの各CSVで、`reference_raw` と `prediction_raw` に含まれる人物名の範囲を目視で対応付けた。`dataset` と `utterance` で元の行を特定できる。人名は全角カタカナで収録した。`BASIC5000_2369.wav` の観測名は1文字をひらがなからカタカナに変換した「エルモハジェームズ」。`expected_mask` の `=` は出力に名前がそのまま残ることを表す。
 
 ### 韓国人名のかな表記
 
@@ -141,7 +145,9 @@ kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b
 
 ## 手作りの文章と名前の典拠
 
-`transcripts.tsv` のイシイカオリ、ヤマモトユウスケ、サイトウ／サトウ、語尾の脱落などはライブラリの利用例を起点に作成した。`length-` の人工的な長音挿入や、同姓の別人を含む文、会議録、境界チェックも手作り。国籍やSTTモデルごとの発生頻度を示すデータではない。外国人名について以下の典拠から確認した差を組み込んだ。
+`japanese_full_names.tsv` は架空の姓名に手で揺れを加え、登録名と観測表記を全角カタカナで記録した。姓・名の長音、清濁、促音化、語頭・語中・語尾の脱落、複数操作を含む。1行は登録読みと観測表記の一組で、異なる姓や名で同じ規則を試し、8組の追加表記では同じ登録読みを再利用した。`expected_mask` は既定設定で得た氏名部分の出力。音声認識の出現頻度は測定していない。[規則と発音研究](#日本人名の資料をどこに反映したか)
+
+`transcripts.tsv` のイシイカオリ、ヤマモトユウスケ、サイトウ／サトウ、語尾の脱落などはライブラリの利用例を起点に作成した。`length-` の人工的な長音挿入や、同姓の別人を含む文、会議録、境界チェックも手作り。国籍やSTTモデルごとの発生頻度を示すデータではない。日本人名の清濁（ザ／サ）、促音化（キクコ／キッコ）、拗音（シュウ／シウ）、語中脱落、普通名詞「おさとう」を含む5文も手作りした。促音化の根拠は[発音研究との対応](#日本人名の資料をどこに反映したか)に記した。外国人名について以下の典拠から確認した差を組み込んだ。
 
 本文、登録する向き、マスクすべき人物、期待するコストはテスト用に設定した。和語・外来語の仮名遣いと先行研究は規則を設計するための参考資料として参照した。[規則の参考資料](#規則の参考資料)
 
@@ -162,8 +168,8 @@ kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b
 
 ## 読みの統計に使える資料
 
-CJKIの日英人名データベース（JEN）は姓と名を別項目で持ち、かな読み、分類、ロケール、頻度を提供する。たとえば日本の姓「一井」の読みは「いちい」で、母音が続く位置が分かる。日本語で表記した中国名のサンプルもあるので、読みの傾向を集計するときはロケールと分類を使う。同社の日英人名データベースを使う場合、同じ読みを持つ漢字表記の数と実際の出現頻度は区別する必要がある。[CJKIの日英人名データベース](https://www.cjk.org/language/ja/data/japanese/proper/japanese-english-database-personal-names/)
+CJKIの日英人名データベース（JEN）は姓と名を別項目で持ち、かな読み、分類、ロケール、頻度を提供する。たとえば日本の姓「一井」の読みは「イチイ」で、母音が続く位置が分かる。日本語で表記した中国名のサンプルもあるので、読みの傾向を集計するときはロケールと分類を使う。同社の日英人名データベースを使う場合、同じ読みを持つ漢字表記の数と実際の出現頻度は区別する必要がある。[CJKIの日英人名データベース](https://www.cjk.org/language/ja/data/japanese/proper/japanese-english-database-personal-names/)
 
 利用案は、姓・名の読みから2〜3モーラの並びを集計し、登録されたフルネームの分割候補を内部で比較すること。姓と名の全組み合わせを用意する必要はない。外国人名のカナ読みも対照にして、長音を挿入してよい位置にどれだけ予測力があるかを別の人物で検証できる。STTの誤りやすさを推定するには、実際の文字起こしと正しい読みの対も必要になる。今回はCJKIの公開仕様と用例を確認した。全件データでの学習・評価は未実施で、モデルや統計表の配布条件は個別ライセンスの確認が必要になる。[CJKIのデータライセンス](https://www.cjk.org/language/ja/licensing/)
 
-同社の日本人名異表記データベース（JNV）では、日本語名をローマ字にしたときに「とう」が `tō / tou / too / to / toh` と揺れる例を確認できる。これらはローマ字入力の評価に利用できる。[CJKIの日本人名異表記データベース](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/)
+同社の日本人名異表記データベース（JNV）では、日本語名をローマ字にしたときに「トウ」が `tō / tou / too / to / toh` と揺れる例を確認できる。これらはローマ字入力の評価に利用できる。[CJKIの日本人名異表記データベース](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/)

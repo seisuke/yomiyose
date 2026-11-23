@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"math"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"unicode"
@@ -14,6 +15,17 @@ import (
 type nameSpan struct {
 	start, end int
 	optional   bool
+}
+
+var katakanaName = regexp.MustCompile("^[ァ-ヺー・\u3099\u309a]+$")
+
+func requireKatakanaNames(t *testing.T, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		if !katakanaName.MatchString(name) {
+			t.Fatalf("expected a katakana name, got %q", name)
+		}
+	}
 }
 
 // Brackets mark required mentions; a leading ? permits masking an extra span.
@@ -35,6 +47,7 @@ func annotatedText(t *testing.T, marked string) (string, []nameSpan) {
 		if !closed || name == "" || strings.Contains(name, "【") {
 			t.Fatal("invalid target", marked)
 		}
+		requireKatakanaNames(t, name)
 		start := plain.Len()
 		plain.WriteString(name)
 		spans = append(spans, nameSpan{start, plain.Len(), optional})
@@ -85,6 +98,7 @@ func TestFLEURSNameMasks(t *testing.T) {
 			const prefix, suffix = "記録は「", "」です。"
 			full, partial, exposed := 0, 0, 0
 			for _, row := range rows[1:] {
+				requireKatakanaNames(t, row[2], row[3])
 				m, err := NewScoped([]ScopedName{{Name: Name{Text: row[2]}, Rules: tc.rules}}, tc.weights)
 				if err != nil {
 					t.Fatal(err)
@@ -125,12 +139,67 @@ func TestKoreanASRNameMasks(t *testing.T) {
 	checkKanaNameMasks(t, "testdata/korean_asr_names.tsv")
 }
 
+func TestJapaneseFullNameMasks(t *testing.T) {
+	const prefix, suffix = "記録は「", "」です。"
+	type totals struct{ full, partial, exposed int }
+	byVariation := make(map[string]totals)
+	var names []Name
+	matchers := make(map[string]*Matcher)
+	seen := make(map[[2]string]bool)
+	rows := readCorpus(t, "testdata/japanese_full_names.tsv", 4)
+	for _, row := range rows[1:] {
+		if name := row[1]; matchers[name] == nil {
+			entry := Name{Text: name}
+			matchers[name] = mustNew(t, DefaultWeights(), entry)
+			names = append(names, entry)
+		}
+	}
+	roster := mustNew(t, DefaultWeights(), names...)
+	for _, row := range rows[1:] {
+		variation, name, observed, expected := row[0], row[1], row[2], row[3]
+		requireKatakanaNames(t, name, observed)
+		pair := [2]string{name, observed}
+		if seen[pair] || name == observed {
+			t.Fatalf("duplicate or unchanged spelling: %q → %q", name, observed)
+		}
+		seen[pair] = true
+		input := prefix + observed + suffix
+		got := matchers[name].MaskDefault(input, "■")
+		if got != prefix+expected+suffix {
+			t.Errorf("%s / %s → %s: got %q, want %q", variation, name, observed, got, prefix+expected+suffix)
+		}
+		if withRoster := roster.MaskDefault(input, "■"); withRoster != got {
+			t.Errorf("%s → %s: roster masked %q, single registration masked %q", name, observed, withRoster, got)
+		}
+		n := byVariation[variation]
+		switch got {
+		case prefix + "■" + suffix:
+			n.full++
+		case input:
+			n.exposed++
+			t.Errorf("%s → %s: name fully exposed", name, observed)
+		default:
+			n.partial++
+		}
+		byVariation[variation] = n
+	}
+	var all totals
+	for variation, n := range byVariation {
+		t.Logf("%s full=%d partial=%d exposed=%d", variation, n.full, n.partial, n.exposed)
+		all.full += n.full
+		all.partial += n.partial
+		all.exposed += n.exposed
+	}
+	t.Logf("names=%d spellings=%d full=%d partial=%d exposed=%d", len(names), len(seen), all.full, all.partial, all.exposed)
+}
+
 func checkKanaNameMasks(t *testing.T, path string) {
 	t.Helper()
 	const prefix, suffix = "記録は「", "」です。"
 	rows := readCorpus(t, path, 5)
 	for _, row := range rows[1:] {
 		t.Run(row[0]+"/"+row[1], func(t *testing.T) {
+			requireKatakanaNames(t, row[2], row[3])
 			m := mustNew(t, DefaultWeights(), Name{Text: row[2]})
 			want := row[4]
 			if want == "=" {
@@ -144,20 +213,19 @@ func checkKanaNameMasks(t *testing.T, path string) {
 }
 
 func TestJapaneseASRReadingExamples(t *testing.T) {
-	rows := readCorpus(t, "testdata/japanese_asr_names.tsv", 7)
+	rows := readCorpus(t, "testdata/japanese_asr_names.tsv", 5)
 	for _, row := range rows[1:] {
-		if row[5] == "-" { // Only the written reference and prediction were recorded.
-			continue
-		}
 		t.Run(row[1], func(t *testing.T) {
+			registered, assumed, expected := row[2], row[3], row[4]
+			requireKatakanaNames(t, registered, assumed)
 			for _, scope := range []RuleSet{AllRules, JapaneseRules} {
-				m, err := NewScoped([]ScopedName{{Name: Name{Text: row[4]}, Rules: scope}}, DefaultWeights())
+				m, err := NewScoped([]ScopedName{{Name: Name{Text: registered}, Rules: scope}}, DefaultWeights())
 				if err != nil {
 					t.Fatal(err)
 				}
-				got := m.MaskDefault("記録は「"+row[5]+"」です。", "■")
-				if want := "記録は「" + row[6] + "」です。"; got != want {
-					t.Errorf("rules %d: %s -> %s: got %q, want %q", scope, row[4], row[5], got, want)
+				got := m.MaskDefault("記録は「"+assumed+"」です。", "■")
+				if want := "記録は「" + expected + "」です。"; got != want {
+					t.Errorf("rules %d: %s -> %s: got %q, want %q", scope, registered, assumed, got, want)
 				}
 			}
 		})
@@ -172,7 +240,9 @@ func checkTranscriptCorpus(t *testing.T, w Weights, overrides map[string]string)
 		t.Run(row[0], func(t *testing.T) {
 			texts++
 			text, targets := annotatedText(t, row[2])
-			m, err := NewReadings(strings.Split(row[1], "|"), w)
+			names := strings.Split(row[1], "|")
+			requireKatakanaNames(t, names...)
+			m, err := NewReadings(names, w)
 			if err != nil {
 				t.Fatal(err)
 			}

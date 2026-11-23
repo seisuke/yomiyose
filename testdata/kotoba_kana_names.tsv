@@ -1,6 +1,6 @@
 dataset	utterance	reference	observed	expected_mask
 jsut_basic5000	BASIC5000_1458.wav	ピーター・ブラウン	ピーターブラウン	■
-jsut_basic5000	BASIC5000_2369.wav	エルモア・ジェイムズ	エルモはジェームズ	■
+jsut_basic5000	BASIC5000_2369.wav	エルモア・ジェイムズ	エルモハジェームズ	■
 jsut_basic5000	BASIC5000_2500.wav	レッド・マリガン	レッドマリガン	■
 common_voice_8_0	common_voice_ja_25943577.mp3	ナワズ・シャリフ	ナワズ・シャリフ	■
 common_voice_8_0	common_voice_ja_26016573.mp3	チャビー・チェッカー	チャビーチェッカー	■
