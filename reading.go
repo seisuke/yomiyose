@@ -11,6 +11,7 @@ type unit struct {
 	sound      string
 	start, end int
 	hira       bool
+	kanaPair   bool // one mora written with two kana (e.g. シュ)
 }
 
 type letter struct {
@@ -21,6 +22,7 @@ type letter struct {
 
 var kana = map[string]string{}
 var latin = map[string]string{}
+var romanKanaPair = map[string]bool{}
 
 func init() {
 	// One column per mora; the roman spelling also identifies the sound internally.
@@ -48,6 +50,12 @@ func init() {
 	for _, pair := range strings.Fields("ヴァ:va ヴィ:vi ヴェ:ve ヴォ:vo ヴュ:vyu ファ:fa フィ:fi フェ:fe フォ:fo フュ:fyu ティ:ti ディ:di テュ:tyu デュ:dyu トゥ:tu ドゥ:du ウィ:wi ウェ:we ウォ:wo シェ:she ジェ:je チェ:che ツァ:tsa ツィ:tsi ツェ:tse ツォ:tso イェ:ye クァ:kwa グァ:gwa") {
 		p := strings.Split(pair, ":")
 		kana[p[0]], latin[p[1]] = p[1], p[1]
+	}
+	// Count romanized moras by their kana spelling (shu = シュ, shi = シ).
+	for spelling, sound := range kana {
+		if utf8.RuneCountInString(spelling) == 2 {
+			romanKanaPair[sound] = true
+		}
 	}
 	// Kunrei aliases; thi and twu disambiguate foreign ティ and トゥ.
 	for _, pair := range strings.Fields("si:shi zi:ji ti:chi tu:tsu hu:fu sya:sha syu:shu syo:sho tya:cha tyo:cho zya:ja zyu:ju zyo:jo thi:ti twu:tu") {
@@ -142,7 +150,7 @@ func tokenize(s string) []unit {
 			w := word.String()
 			for len(w) > 0 {
 				sound, n := romanMora(w)
-				out = append(out, unit{sound, chars[begin].start, chars[begin+n-1].end, false})
+				out = append(out, unit{sound, chars[begin].start, chars[begin+n-1].end, false, romanKanaPair[sound]})
 				w, begin = w[n:], begin+n
 			}
 			continue
@@ -170,7 +178,7 @@ func tokenize(s string) []unit {
 		case sound == "" && (unicode.IsLetter(r) || unicode.IsDigit(r)):
 			sound = string(r) // literal spelling, including kanji and accented letters
 		}
-		out = append(out, unit{sound, chars[begin].start, chars[i-1].end, chars[begin].hira || chars[i-1].hira})
+		out = append(out, unit{sound, chars[begin].start, chars[i-1].end, chars[begin].hira || chars[i-1].hira, i-begin == 2})
 	}
 	return out
 }

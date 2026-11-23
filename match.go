@@ -49,7 +49,15 @@ type Weights struct {
 	LimitByMoraCount     bool    // apply MoraLimits to Find/Mask; enabled by DefaultWeights
 
 	MoraLimits *MoraLimits // nil uses the default length bands; copied when creating a matcher
+
+	MatchPrefixes          bool    // also search for proper prefixes of a registered reading
+	MinPrefixChars         int     // minimum normalized kana characters on both sides; 3, 4 or 5
+	PrefixMaxCost          float64 // overall prefix ceiling, including five-character matches
+	ThreeCharPrefixMaxCost float64 // additional cap when the shorter side has three characters
+	FourCharPrefixMaxCost  float64 // additional cap when the shorter side has four characters
 }
+
+const maxPrefixChars = 5
 
 // MoraLimits sets search costs by the shorter of the registered and matched readings.
 // The one- and two-mora restrictions in Weights also apply.
@@ -73,6 +81,7 @@ func DefaultWeights() Weights {
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
 		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
 		LimitByMoraCount: true, MoraLimits: &MoraLimits{UpTo6: 1.5, From7To9: 1.75, From10: 2},
+		MinPrefixChars: 3, ThreeCharPrefixMaxCost: 0.75, FourCharPrefixMaxCost: 1, PrefixMaxCost: 1.25,
 	}
 }
 
@@ -174,6 +183,9 @@ func New(names []Name, w Weights) (*Matcher, error) {
 // NewScoped compiles a list with an explicit rule set per name. The zero rule
 // set is AllRules. The matcher never guesses a rule set from the spelling.
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
+	if w.MatchPrefixes && (w.MinPrefixChars < 3 || w.MinPrefixChars > maxPrefixChars) {
+		return nil, fmt.Errorf("yomiyose: MinPrefixChars must be between 3 and 5 when matching prefixes")
+	}
 	if w.MoraLimits == nil {
 		w.MoraLimits = DefaultWeights().MoraLimits
 	} else {
@@ -181,7 +193,7 @@ func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 		w.MoraLimits = &limits // the compiled matcher owns its settings
 	}
 	for _, v := range []float64{w.LongSpelling, w.EiSpelling, w.OuSpelling, w.LongLoss, w.FinalLongLoss,
-		w.MoraLimits.UpTo6, w.MoraLimits.From7To9, w.MoraLimits.From10,
+		w.MoraLimits.UpTo6, w.MoraLimits.From7To9, w.MoraLimits.From10, w.PrefixMaxCost, w.ThreeCharPrefixMaxCost, w.FourCharPrefixMaxCost,
 		w.TuToWa, w.PuaContraction, w.ForeignLongInsertion, w.ForeignLongDeletion,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
 		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
@@ -486,6 +498,16 @@ func countsTowardLength(t unit) bool {
 	return t.sound != " " && t.sound != "'" && t.sound != ""
 }
 
+func (t unit) kanaChars() int {
+	if !countsTowardLength(t) {
+		return 0
+	}
+	if t.kanaPair {
+		return 2
+	}
+	return 1
+}
+
 func (l MoraLimits) costLimit(moras int) float64 {
 	switch {
 	case moras <= 6:
@@ -519,20 +541,68 @@ func tailAfterMarker(b []unit, end int, last string) bool {
 		(b[end].sound == "^" || isLong(b[end-1].sound, b[end].sound))
 }
 
-// align compares one name to an observation beginning at a fixed position.
-// In prefix mode it remembers the cheapest endpoint and stops as soon as all
-// live paths cost more. Future edits have nonnegative costs.
-func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, omitHead bool) (int, float64) {
+type alignmentMode int
+
+const (
+	wholeReading alignmentMode = iota
+	searchFullName
+	searchNamePrefix
+)
+
+func (w *ruleWeights) withinLengthLimit(moras int, exact bool, cost float64) bool {
+	if moras == 1 && w.ExactSingleMora && !exact {
+		return false
+	}
+	if moras == 2 && cost > w.TwoMoraMaxCost {
+		return false
+	}
+	return !w.LimitByMoraCount || cost <= w.MoraLimits.costLimit(moras)
+}
+
+// Each column is the cost of matching a prefix of the same registered reading.
+// The unconsumed suffix costs nothing. Full readings are scored separately.
+func (w *ruleWeights) namePrefixCost(a []unit, row []float64, observedChars, observedMoras int) float64 {
+	best := math.Inf(1)
+	chars, moras := 0, 0
+	for i, t := range a[:len(a)-1] {
+		width := t.kanaChars()
+		if width == 0 {
+			continue
+		}
+		chars += width
+		if chars > maxPrefixChars {
+			break
+		}
+		moras++
+		limit := w.PrefixMaxCost
+		switch min(chars, observedChars) {
+		case 3:
+			limit = w.ThreeCharPrefixMaxCost
+		case 4:
+			limit = w.FourCharPrefixMaxCost
+		}
+		cost := row[i+1]
+		if chars >= w.MinPrefixChars && cost <= limit && cost < best &&
+			w.withinLengthLimit(min(moras, observedMoras), false, cost) {
+			best = cost
+		}
+	}
+	return best
+}
+
+// align compares one reading to text beginning at a fixed position. Full names
+// prefer the cheapest endpoint; partial names prefer the longest within budget.
+func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode alignmentMode, omitHead bool) (int, float64) {
 	width := len(a) + 1
 	older, prev, curr := rows[:width], rows[width:2*width], rows[2*width:]
 	prev[0] = 0
-	referenceLength, observedLength := 0, 0
+	referenceLength, observedLength, observedChars := 0, 0, 0
 	sameSounds := true
 	last := len(a) - 1
 	canDropTail := last > 0 && vowel(a[last].sound) != 0 && !isLong(a[last-1].sound, a[last].sound)
 	for i := range a {
 		prev[i+1] = prev[i] + w.gap(a, i, b, 0, true)
-		if prefix && countsTowardLength(a[i]) {
+		if mode != wholeReading && countsTowardLength(a[i]) {
 			referenceLength++
 		}
 	}
@@ -543,7 +613,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			break
 		}
 		script := 0.0
-		if prefix && t.hira {
+		if mode != wholeReading && t.hira {
 			script = w.Hiragana
 		}
 		curr[0] = prev[0] + w.gap(b, j, a, 0, false) + script
@@ -579,13 +649,13 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			}
 			low = math.Min(low, curr[i+1])
 		}
-		if canDropTail && (!prefix || !tailAfterMarker(b, j+1, a[last].sound)) {
+		if canDropTail && mode != searchNamePrefix && (mode == wholeReading || !tailAfterMarker(b, j+1, a[last].sound)) {
 			curr[last+1] = math.Min(curr[last+1], curr[last]+w.TailLoss)
 			low = math.Min(low, curr[last+1])
 		}
 		older, prev, curr = prev, curr, older
 		previousScript = script
-		if prefix {
+		if mode != wholeReading {
 			// A two-mora edit can still skip this row to finish at the next one.
 			if low > limit {
 				canFinishKanaPair := w.KanaSize <= limit && compactKana(b, j) != ""
@@ -601,23 +671,28 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, prefix, 
 			sameSounds = sameSounds && j < len(a) && a[j].sound == t.sound
 			// Test each endpoint independently. A rejected two-mora prefix
 			// can still lead to an eligible three-mora match.
+			if mode == searchNamePrefix {
+				width := t.kanaChars()
+				observedChars += width
+				if observedChars > maxPrefixChars {
+					break
+				}
+				if observedChars >= w.MinPrefixChars && width > 0 {
+					cost := w.namePrefixCost(a, prev, observedChars, observedLength)
+					if cost <= limit && !math.IsInf(cost, 1) {
+						best, end = cost, j+1
+					}
+				}
+				continue
+			}
 			shorter := min(referenceLength, observedLength)
-			if shorter == 1 && w.ExactSingleMora && (!sameSounds || j+1 != len(a)) {
-				continue
-			}
 			cost := prev[len(a)]
-			if w.LimitByMoraCount && cost > w.MoraLimits.costLimit(shorter) {
-				continue
-			}
-			if shorter == 2 && cost > w.TwoMoraMaxCost {
-				continue
-			}
-			if cost <= limit {
+			if cost <= limit && w.withinLengthLimit(shorter, sameSounds && j+1 == len(a), cost) {
 				best, end, limit = cost, j+1, cost
 			}
 		}
 	}
-	if prefix {
+	if mode != wholeReading {
 		return end, best
 	}
 	return len(b), prev[len(a)]
@@ -644,7 +719,7 @@ func (m *Matcher) DistanceWithRules(reference, observed string, rules RuleSet) f
 		}
 	}
 	w := m.rules[rules].forReading(a)
-	_, cost := w.align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), false, false)
+	_, cost := w.align(a, b, make([]float64, 3*(len(a)+1)), math.Inf(1), wholeReading, false)
 	return cost
 }
 
@@ -703,9 +778,9 @@ func (m *Matcher) FindDefault(text string) []Match {
 }
 
 // Find returns occurrences with cost <= maxCost, in source order. For each
-// name, better matches suppress overlapping worse matches. For each start/reading
-// the longest of its cheapest prefixes wins; equal-cost overlaps from other
-// starts are retained unless one contains the other. Different names are independent.
+// name, full-name matches take precedence over overlapping prefix matches.
+// At a given start the cheapest full-name span wins (longest if tied); prefix
+// matching instead takes the longest span within its limit. Names are independent.
 func (m *Matcher) Find(text string, maxCost float64) []Match {
 	if len(m.names) == 0 || maxCost < 0 || math.IsNaN(maxCost) {
 		return nil
@@ -725,58 +800,42 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 	// Bytes are marked only after all candidates at the same cost were considered.
 	occupied := make([]bool, len(text))
 	for index, name := range m.names {
-		var hits []Match
+		var full, partial []Match
 		for _, form := range name.forms {
 			w := m.rules[name.rules].forReading(form)
-			limit := maxCost
 			rows := make([]float64, 3*(len(form)+1))
-			omitHead := w.HeadLoss <= limit && canOmitHead(form)
-			check := func(i int) {
-				end, c := w.align(form, tokens[i:], rows, limit, true, omitHead)
-				if end > 0 && !math.IsInf(c, 1) {
-					hits = append(hits, Match{name.text, index, tokens[i].start, tokens[i+end-1].end, c})
+			find := func(hits []Match, limit float64, mode alignmentMode) []Match {
+				omitHead := mode == searchFullName && w.HeadLoss <= limit && canOmitHead(form)
+				check := func(i int) {
+					end, c := w.align(form, tokens[i:], rows, limit, mode, omitHead)
+					if end > 0 && !math.IsInf(c, 1) {
+						hits = append(hits, Match{name.text, index, tokens[i].start, tokens[i+end-1].end, c})
+					}
 				}
+				if limit < w.Other {
+					for _, sound := range w.initialSounds(form, limit, omitHead) {
+						for _, i := range positions[sound] {
+							check(i)
+						}
+					}
+				} else {
+					for i, t := range tokens {
+						if t.sound != "" {
+							check(i)
+						}
+					}
+				}
+				return hits
 			}
-			if limit < w.Other {
-				for _, sound := range w.initialSounds(form, limit, omitHead) {
-					for _, i := range positions[sound] {
-						check(i)
-					}
-				}
-			} else {
-				for i, t := range tokens {
-					if t.sound != "" {
-						check(i)
-					}
-				}
+			full = find(full, maxCost, searchFullName)
+			if w.MatchPrefixes && len(form) > 1 {
+				partial = find(partial, min(maxCost, w.PrefixMaxCost), searchNamePrefix)
 			}
 		}
-		sort.Slice(hits, func(i, j int) bool {
-			a, b := hits[i], hits[j]
-			if a.Cost != b.Cost {
-				return a.Cost < b.Cost
-			}
-			if a.Start != b.Start {
-				return a.Start < b.Start
-			}
-			return a.End > b.End
-		})
 		first := len(result)
-		for i := 0; i < len(hits); {
-			group := len(result)
-			cost := hits[i].Cost
-			farthestEnd := -1
-			for ; i < len(hits) && hits[i].Cost == cost; i++ {
-				h := hits[i]
-				if h.End <= farthestEnd { // contained in an equally good hit
-					continue
-				}
-				if !overlaps(occupied[h.Start:h.End]) {
-					result = append(result, h)
-					farthestEnd = h.End
-				}
-			}
-			mark(occupied, result[group:], true)
+		result = appendUnoccupied(result, full, occupied)
+		if len(partial) > 0 {
+			result = appendUnoccupied(result, partial, occupied)
 		}
 		mark(occupied, result[first:], false)
 	}
@@ -790,6 +849,38 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 		}
 		return a.Cost < b.Cost
 	})
+	return result
+}
+
+// Lower-cost hits occupy their ranges first. The caller also uses this to
+// reserve full-name hits before considering partial hits for the same name.
+func appendUnoccupied(result, hits []Match, occupied []bool) []Match {
+	sort.Slice(hits, func(i, j int) bool {
+		a, b := hits[i], hits[j]
+		if a.Cost != b.Cost {
+			return a.Cost < b.Cost
+		}
+		if a.Start != b.Start {
+			return a.Start < b.Start
+		}
+		return a.End > b.End
+	})
+	for i := 0; i < len(hits); {
+		group := len(result)
+		cost := hits[i].Cost
+		farthestEnd := -1
+		for ; i < len(hits) && hits[i].Cost == cost; i++ {
+			h := hits[i]
+			if h.End <= farthestEnd { // contained in an equally good hit
+				continue
+			}
+			if !overlaps(occupied[h.Start:h.End]) {
+				result = append(result, h)
+				farthestEnd = h.End
+			}
+		}
+		mark(occupied, result[group:], true)
+	}
 	return result
 }
 
