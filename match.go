@@ -79,7 +79,7 @@ func DefaultWeights() Weights {
 		TiChi: 0.25, TuToWa: 0.25, PuaContraction: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
-		Hiragana: 0.125, TwoMoraMaxCost: 1, ExactSingleMora: true,
+		Hiragana: 0, TwoMoraMaxCost: 1, ExactSingleMora: true,
 		LimitByMoraCount: true, MoraLimits: &MoraLimits{UpTo6: 1.5, From7To9: 1.75, From10: 2},
 		MinPrefixChars: 3, ThreeCharPrefixMaxCost: 0.75, FourCharPrefixMaxCost: 1, PrefixMaxCost: 1.25,
 	}

@@ -32,11 +32,11 @@ func TestForeignSpellingCosts(t *testing.T) {
 			t.Errorf("JapaneseRules for %s: %g", tc.observed, got)
 		}
 	}
-	const name, phrase = "トゥプア・タマセーゼ", "とわっぱ・タマセーゼ"
+	const name, phrase = "トゥプア・タマセーゼ", "トワッパ・タマセーゼ"
 	m := mustNew(t, w, Name{Text: name})
-	want := w.TuToWa + w.PuaContraction + 4*w.Hiragana
+	want := w.TuToWa + w.PuaContraction
 	if hits := m.Find(phrase, want); len(hits) != 1 || hits[0].Cost != want || phrase[hits[0].Start:hits[0].End] != phrase {
-		t.Errorf("hiragana and original span: %+v", hits)
+		t.Errorf("combined edits and original span: %+v", hits)
 	}
 	w.TuToWa, w.PuaContraction = math.Inf(1), math.Inf(1)
 	if got := mustNew(t, w, Name{Text: name}).Mask("トワッパ・タマセーゼ", 1, "■"); got != "トワッパ・タマセーゼ" {

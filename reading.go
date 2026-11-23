@@ -64,20 +64,16 @@ func init() {
 	}
 }
 
-const halfwidth = "ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン"
-
-var wideKana = []rune(halfwidth)
-
 func kanaVoice(r, mark rune) rune {
 	switch mark {
-	case 'ﾞ', '\u3099':
+	case '\u3099':
 		if strings.ContainsRune("カキクケコサシスセソタチツテトハヒフヘホ", r) {
 			return r + 1
 		}
 		if r == 'ウ' {
 			return 'ヴ'
 		}
-	case 'ﾟ', '\u309a':
+	case '\u309a':
 		if strings.ContainsRune("ハヒフヘホ", r) {
 			return r + 2
 		}
@@ -104,8 +100,6 @@ func letters(s string) []letter {
 		switch {
 		case hira:
 			r += 'ア' - 'あ'
-		case r >= 'ｦ' && r <= 'ﾝ':
-			r = wideKana[r-'ｦ']
 		case r >= '！' && r <= '～':
 			r -= 0xfee0
 		}
@@ -175,6 +169,8 @@ func tokenize(s string) []unit {
 			}
 		case r == '’' || r == '\'':
 			sound = "'"
+		case r >= 'ｦ' && r <= 'ﾟ':
+			// Unsupported halfwidth kana form a boundary in the transcript.
 		case sound == "" && (unicode.IsLetter(r) || unicode.IsDigit(r)):
 			sound = string(r) // literal spelling, including kanji and accented letters
 		}

@@ -33,8 +33,13 @@ func TestNamePrefixes(t *testing.T) {
 			t.Errorf("hit %d: %+v", i, hit)
 		}
 	}
-	if got := m.MaskDefault(ordinaryText, "■"); got != "お■を加えてください。■ウコさんも来ます。" {
+	if got := m.MaskDefault(ordinaryText, "■"); got != "お■加えてください。■ウコさんも来ます。" {
 		t.Errorf("matches without a name boundary: %q", got)
+	}
+	w.Hiragana = .125
+	m = mustNew(t, w, Name{Text: name})
+	if hits := m.FindDefault("おさとう。"); len(hits) != 1 || hits[0].Cost != .375 {
+		t.Errorf("configured script cost for the common noun: %+v", hits)
 	}
 }
 
@@ -102,14 +107,12 @@ func TestPrefixAndFullNameOverlap(t *testing.T) {
 func TestPrefixKanaCharacters(t *testing.T) {
 	w := DefaultWeights()
 	w.MatchPrefixes = true
-	for _, name := range []string{"シュンタカヒロ", "shuntakahiro"} {
-		m := mustNew(t, w, Name{Text: name})
-		if got := m.MaskDefault("ｼｭ、しゅ・ん、shun、シュ。ン。", "■"); got != "ｼｭ、■、■、シュ。ン。" {
-			t.Errorf("%q: %q", name, got)
-		}
+	m := mustNew(t, w, Name{Text: "シュンタカヒロ"})
+	if got := m.MaskDefault("シュ、シュ・ン、シュ。ン。", "■"); got != "シュ、■、シュ。ン。" {
+		t.Errorf("small kana character count: %q", got)
 	}
-	m := mustNew(t, w, Name{Text: "ザキヤマリョウタ"})
-	if got := m.MaskDefault("ｻﾞ･ｷ、さ\u3099き、ざ き、ｻﾞｷﾔ。", "■"); got != "ｻﾞ･ｷ、さ\u3099き、ざ き、■。" {
+	m = mustNew(t, w, Name{Text: "ザキヤマリョウタ"})
+	if got := m.MaskDefault("ザ・キ、サ\u3099キ、ザ キ、ザキヤ。", "■"); got != "ザ・キ、サ\u3099キ、ザ キ、■。" {
 		t.Errorf("normalized character count: %q", got)
 	}
 }
@@ -133,7 +136,7 @@ func TestPrefixCharacterBands(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, text, want string }{
 		{"タカハシリョウタ", "タケハ", "タケハ"},     // one ordinary edit exceeds the three-character cap.
-		{"タカハシリョウタ", "たカミハシ", "たカミハシ"}, // five observed vs four registered: cost 1.125 exceeds 1.
+		{"タカハシリョウタ", "タガミハシ", "タガミハシ"}, // five observed vs four registered: cost 1.25 exceeds 1.
 		{"ヤマノウチダアキヒロ", "マノウチダ", "■ダ"},  // a sixth registered character cannot extend the prefix.
 		{"コバヤカワタカヒロ", "コバヤカワタ。コバヤカワタカヒロ。", "■タ。■。"},
 	} {

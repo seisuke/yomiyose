@@ -4,7 +4,7 @@
 
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
-| [transcripts.tsv](testdata/transcripts.tsv) | 64文、必須のフルネーム71か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
+| [transcripts.tsv](testdata/transcripts.tsv) | 63文、必須のフルネーム70か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
 | [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人11人、21出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
 | [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、かなの正解名と実際の出力を抜粋 |
 | [korean_asr_names.tsv](testdata/korean_asr_names.tsv) | 韓国人14人、16発話 | 日本語放送の字幕と、同じ発話に対するWhisper large-v3の出力を照合。氏名の範囲を抜粋 |
