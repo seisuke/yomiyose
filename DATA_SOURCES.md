@@ -1,16 +1,16 @@
 # テストデータの出典
 
-ここには各データの入手元・抽出方法・利用条件と、規則の設計に参照した文献を記録する。どの名前をどこまでマスクできたかは [EVALUATION.md](EVALUATION.md)、ライブラリの使い方は [README.md](README.md) を参照。
+テストデータごとに、出典、用例の選び方、利用条件を示す。照合規則の設計に使った文献も併記する。どの名前をどこまでマスクできたかは [EVALUATION.md](EVALUATION.md)、ライブラリの使い方は [README.md](README.md) を参照。
 
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
 | [japanese_full_names.tsv](testdata/japanese_full_names.tsv) | 登録読み99種類、観測表記107通り | 日本人の姓と名を組み合わせて作ったかな表記の回帰例 |
 | [transcripts.tsv](testdata/transcripts.tsv) | 65文、必須のフルネーム70か所 | 利用例と手作りの文章テスト。一部に個人名典拠の異表記を使用 |
 | [fleurs_names.tsv](testdata/fleurs_names.tsv) | 外国人11人、21出力（発話とモデルの組） | 日本語音声に対する正解文と実際のSTT出力から、フルネームの部分を抜粋 |
-| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、正解名と認識結果から人名を抜粋しカタカナ化 |
+| [kotoba_kana_names.tsv](testdata/kotoba_kana_names.tsv) | 外国人11人、11発話 | Kotoba Technologies の Whisper large-v3 評価結果から、正解文と認識結果から氏名を抜き出し、カタカナに統一 |
 | [korean_asr_names.tsv](testdata/korean_asr_names.tsv) | 韓国人14人、16発話 | 日本語放送の字幕と、同じ発話に対するWhisper large-v3の出力を照合。氏名の範囲を抜粋 |
 | [korean_name_spellings.tsv](testdata/korean_name_spellings.tsv) | 韓国人3人、4組のかな表記（参考資料） | 日本語の音楽・映画資料、報道に載った同一人物の表記を対にして記録 |
-| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人2人、2発話を参照した補助テスト | 漢字で出力された氏名に人手でかなの読みを仮定。公開STTのかな氏名のマスク性能集計からは除外 |
+| [japanese_asr_names.tsv](testdata/japanese_asr_names.tsv) | 日本人2人、2発話を参照した補助テスト | 漢字で出力された氏名に、テスト用の読みを人手で付与。公開STTのかな氏名のマスク性能集計からは除外 |
 
 ## テストデータの利用条件
 
@@ -41,7 +41,7 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 | Hara（2016）、日本人のフルネームの読み上げ | 姓末と名頭で異なる母音が続くフルネーム20通りを16人が各3回発声し、960発声のうち840件を分析した。連続する母音の平均持続時間は姓名の境界で約211 ms、別に測った実在語の内部で約270 msだった。 | 姓名を続けて言ったときに境目の母音がどう聞こえうるかを調べる資料。話速は統制しておらず、持続時間から文字の脱落率は推定できない。使用した姓名は付録2、計測値は表8。[Newcastle大学の博士論文](https://theses.ncl.ac.uk/jspui/handle/10443/3420) |
 | 国立国語研究所、CSJの長母音の短呼 | 「本当」を「ホント」と短く発音する例を含む。短単位内の長母音の短呼率は語頭0.09%、語中3.77%、語末4.71%だった。 | 長音の位置を分けて調べる根拠になる。この集計には一般語が含まれ、入力が姓名連結なら姓末がどこかは分からない。[CSJ予備的分析 §6-4](https://clrd.ninjal.ac.jp/csj/misc/preliminary/j6_2.html) |
 
-これらの資料の観測対象は人の発音。GPT Liveがカタカナで確定したフルネームの欠落例は今回確認できなかった。上記の件数はSTT回帰テストの分母に含めていない。`VowelLoss` の0.25は利用例「サイトウ／サトウ」用の設定値で、この発話研究から推定した重みではない。
+これらの資料の観測対象は人の発音。GPT Liveがカタカナで確定したフルネームの欠落例は今回確認できなかった。これらの発音研究で調べた件数は、STT出力を使ったテストの集計から除いた。`VowelLoss` の0.25は利用例「サイトウ／サトウ」用の設定値で、この発話研究から推定した重みではない。
 
 ### 日本人の姓にあるハとワ
 
@@ -73,7 +73,7 @@ JSUT basic5000 から3発話、Common Voice 8 日本語から2発話、ReazonSpe
 
 ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Whisper large-v3 で「キム・シュウ」になった。`81d3b99d7b38f.flac` の「アン・チャンイル」は正解と出力の両方に同じ表記があり、一致する対照例に選んだ。[Kotobaの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
 
-別の16発話は Japanese ASR が公開した ReazonSpeech `small` の学習用分割から採った。15個のParquetに含まれる62,047発話の `transcription` から、「キム」「パク」などの姓に中黒・空白と名が続く箇所や、今回調べた表記を抽出した。候補の前後を読み、人物を確認でき、字幕と出力の双方でかなの氏名部分を特定できる発話を選んだ。判定にはマスクの成否を使っていない。[データセットとモデル説明](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small)・[参照したParquetの固定版](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small/tree/c74b52fc164cf7b64936ca62aee4336eac626739/small)
+別の16発話は Japanese ASR が公開した ReazonSpeech `small` の学習用分割から採った。15個のParquetに含まれる62,047発話の `transcription` から、「キム」「パク」などの姓に中黒・空白と名が続く箇所や、今回調べた表記を抽出した。候補の前後を読み、人物を確認でき、字幕と出力の双方でかなの氏名部分を特定できる発話を選んだ。発話を選ぶ際に、マスクの成否は条件に含めなかった。[データセットとモデル説明](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small)・[参照したParquetの固定版](https://huggingface.co/datasets/japanese-asr/whisper_transcriptions.reazonspeech.small/tree/c74b52fc164cf7b64936ca62aee4336eac626739/small)
 
 元データの `name` がTSVの `utterance` に対応する。同じ行の `whisper_transcript` をWhisperの多言語語彙で復号し、特殊トークンを除いた文字列から `observed` を抜き出した。中黒の位置や長音は出力のまま保存した。尹氏の3発話には「ユン・ソンニョル → ユンソン・ヨル」「ユン・ソギョル → ユンソギョル」「ユン・ソンニョル → ユン・ソンニョル」がある。これらは「ソンニョル」が「ソギョル」に置き換わった発話には該当しない。[発話IDと表記対](testdata/korean_asr_names.tsv)
 
@@ -101,7 +101,7 @@ ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Wh
 
 大井川（2016）の知覚実験では、米語で母音間の /t/ がはじき音 [ɾ] になった音声を、日本語話者が主にラ行またはダ行に対応づけた。文化庁の日本語教育研究協議会には *better* の「ベター／ベラー」、*pudding* の「プリン」という例もある。国立国語研究所は、日本語でもラ行とダ行の混同を観察できると説明している。これらは音声上の根拠で、個別の日本語STT出力で何が発音されたかは特定できない。[大井川の知覚実験](https://www.isca-archive.org/isaph_2016/ooigawa16_isaph.html)・[文化庁の協議記録](https://www.bunka.go.jp/seisaku/kokugo_nihongo/kyoiku/taikai/16_kansai/bunkakai_2.html)・[国立国語研究所の解説](https://kotoba.ninjal.ac.jp/qa/yokuaru/qa-246/)
 
-上記のFLEURSとKotobaの正解文・出力をNFKCでそろえ、中黒と空白を除いてモーラに近いかな単位で比較した。差分に現れた同母音のラ行とダ行・タ行の候補を原文で確認した。次の向きは正解表記からモデル出力への向きを表す。
+上記のFLEURSとKotobaの正解文・出力をNFKCでそろえ、中黒と空白を除いてモーラに近いかな単位で比較した。差分に現れた同母音のラ行とダ行・タ行の候補を原文で確認した。次の表の矢印は、正解表記からモデル出力への変化を示す。
 
 | 正解の該当部分 → 実際の出力 | 発話とモデル | 観察 |
 |---|---|---|
@@ -115,11 +115,11 @@ ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Wh
 
 `fleurs-0453` の anime-whisper 出力「ディ・シェン・ルーン」も、長音の落ちた語頭の回帰例として収録した。かなでフルネームが残る `fleurs-0162`（Whisper large-v3-turbo）と `fleurs-0603`（anime-whisper）も見落としを検証する行として収録した。TSV の `default_mask` は既定の長さ別上限での期待マスク。`max_1_5_mask` は上限をさらに `1.5` に絞った場合の期待マスク。この21件では既定の長さ別上限で標準設定と `ForeignRules` が同じ結果になり、両方を検証している。語中の「ロ」、末尾の「フィ」などを削った短縮例は別途Goテストで作成し、公開出力の件数から除外した。
 
-フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者は語頭の照合、後者はラ行以外も変わる見落としの検証に使う。タ行については今回の抽出でタ行との置換だけで説明できるフルネームの例を確認できず、資料にとどめた。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
+フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者では語頭の照合を、後者ではラ行のほかにも音が変わる場合の取りこぼしを検証する。タ行については今回の抽出でタ行との置換だけで説明できるフルネームの例を確認できず、資料にとどめた。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
 
 ### トゥプアの異表記と発音資料
 
-サモアの独立運動指導者の綴りは **Tupua Tamasese Lealofi III**。FLEURS 日本語の `fleurs-0332`、`0333`、`0334` は正解文が同一の3発話である。Whisper large-v3-turbo の先頭は順に「トゥプア」「トワッパー」「トゥプア」。中央の発話では Whisper large-v3 が「トゥアッパー」、Whisper medium が「トワッパー」と出力した。同じ録音に対する複数モデルの表記なので、話者がどう発音したかや、別の人名での発生率はこの比較から決まらない。[ニュージーランド公文書館](https://www.archives.govt.nz/discover-our-stories/the-rise-of-the-mau-and-the-fall-of-colonial-rule-in-samoa)・[各モデルの出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)
+サモアの独立運動指導者の綴りは **Tupua Tamasese Lealofi III**。FLEURS 日本語の `fleurs-0332`、`0333`、`0334` は正解文が同一の3発話である。Whisper large-v3-turbo の先頭は順に「トゥプア」「トワッパー」「トゥプア」。中央の発話では Whisper large-v3 が「トゥアッパー」、Whisper medium が「トワッパー」と出力した。中央の発話については、同じ録音に対する各モデルの出力を比較している。この結果だけでは、話者がどう発音したか、別の人名で同じ揺れがどの程度起きるかは判断できない。[ニュージーランド公文書館](https://www.archives.govt.nz/discover-our-stories/the-rise-of-the-mau-and-the-fall-of-colonial-rule-in-samoa)・[各モデルの出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)
 
 - **トゥ／ト**。文化庁は同じ人名の表記例として「ハチャトゥリヤン／ハチャトリヤン」を挙げる。STTでも JSUT `BASIC5000_3315.wav` で「シャクロヴィートゥイ → シャクロビートイ」があり、ヴィ／ビとトゥ／トの2か所が対応する。[文化庁「外来語の表記」第6項](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)・[JSUTのWhisper large-v3出力](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
 - **プア／プワ**。Whisper large-v3 は `fleurs-0332` と `0334` で「トゥプワ」と出力した。Zuraw・Yu・Orfitelli はサモア語の一部の母音列で /u/ が [w] や [uw] として現れる例を報告する。一方、子音の直後では通常その転写をしなかったと明記している。Tupua の /p/ 直後への適用は実証されておらず、「プワ」と「ワッパー」ではワに対する子音の位置も異なる。[サモア語の音声研究、第8節](https://linguistics.ucla.edu/people/zuraw/dnldpprs/ZurawYuOrfitelli_Samoan_Phonology_2014.pdf)
@@ -171,6 +171,6 @@ kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b
 
 CJKIの日英人名データベース（JEN）は姓と名を別項目で持ち、かな読み、分類、ロケール、頻度を提供する。たとえば日本の姓「一井」の読みは「イチイ」で、母音が続く位置が分かる。日本語で表記した中国名のサンプルもあるので、読みの傾向を集計するときはロケールと分類を使う。同社の日英人名データベースを使う場合、同じ読みを持つ漢字表記の数と実際の出現頻度は区別する必要がある。[CJKIの日英人名データベース](https://www.cjk.org/language/ja/data/japanese/proper/japanese-english-database-personal-names/)
 
-利用案は、姓・名の読みから2〜3モーラの並びを集計し、登録されたフルネームの分割候補を内部で比較すること。姓と名の全組み合わせを用意する必要はない。外国人名のカナ読みも対照にして、長音を挿入してよい位置にどれだけ予測力があるかを別の人物で検証できる。STTの誤りやすさを推定するには、実際の文字起こしと正しい読みの対も必要になる。今回はCJKIの公開仕様と用例を確認した。全件データでの学習・評価は未実施で、モデルや統計表の配布条件は個別ライセンスの確認が必要になる。[CJKIのデータライセンス](https://www.cjk.org/language/ja/licensing/)
+利用案は、姓・名の読みから2〜3モーラの並びを集計し、登録されたフルネームの分割候補を内部で比較すること。姓と名の全組み合わせを用意する必要はない。外国人名のカナ読みも対照にして、長音が加わる位置をどの程度予測できるかを、集計に使っていない人物の名前で検証できる。STTの誤りやすさを推定するには、実際の文字起こしと正しい読みの対も必要になる。今回はCJKIの公開仕様と用例を確認した。全件データでの学習・評価は未実施で、モデルや統計表の配布条件は個別ライセンスの確認が必要になる。[CJKIのデータライセンス](https://www.cjk.org/language/ja/licensing/)
 
 同社の日本人名異表記データベース（JNV）では、日本語名をローマ字にしたときに「トウ」が `tō / tou / too / to / toh` と揺れる例を確認できる。これらはローマ字入力の評価に利用できる。[CJKIの日本人名異表記データベース](https://www.cjk.org/language/ja/data/japanese/proper/database-japanese-personal-name-variants/)
