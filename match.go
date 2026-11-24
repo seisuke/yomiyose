@@ -43,10 +43,10 @@ type Weights struct {
 	TailLoss             float64 // one missing final ordinary mora of the reference
 	HeadLoss             float64 // Find/Mask: omit the first mora if six vowel-bearing moras remain
 	Other                float64 // other mora insertions, deletions and substitutions
-	Hiragana             float64 // per observed mora originally written in hiragana
-	TwoMoraMaxCost       float64 // Find/Mask ceiling for two moras; +Inf uses the caller's limit
-	ExactSingleMora      bool    // require identical normalized sounds for a one-mora candidate
-	LimitByMoraCount     bool    // apply MoraLimits to Find/Mask; enabled by DefaultWeights
+
+	TwoMoraMaxCost   float64 // Find/Mask ceiling for two moras; +Inf uses the caller's limit
+	ExactSingleMora  bool    // require identical normalized sounds for a one-mora candidate
+	LimitByMoraCount bool    // apply MoraLimits to Find/Mask; enabled by DefaultWeights
 
 	MoraLimits *MoraLimits // nil uses the default length bands; copied when creating a matcher
 
@@ -79,7 +79,7 @@ func DefaultWeights() Weights {
 		TiChi: 0.25, TuToWa: 0.25, PuaContraction: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
 		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
-		Hiragana: 0, TwoMoraMaxCost: 1, ExactSingleMora: true,
+		TwoMoraMaxCost: 1, ExactSingleMora: true,
 		LimitByMoraCount: true, MoraLimits: &MoraLimits{UpTo6: 1.5, From7To9: 1.75, From10: 2},
 		MinPrefixChars: 3, ThreeCharPrefixMaxCost: 0.75, FourCharPrefixMaxCost: 1, PrefixMaxCost: 1.25,
 	}
@@ -196,7 +196,7 @@ func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 		w.MoraLimits.UpTo6, w.MoraLimits.From7To9, w.MoraLimits.From10, w.PrefixMaxCost, w.ThreeCharPrefixMaxCost, w.FourCharPrefixMaxCost,
 		w.TuToWa, w.PuaContraction, w.ForeignLongInsertion, w.ForeignLongDeletion,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
-		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.Hiragana, w.TwoMoraMaxCost} {
+		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -607,45 +607,40 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 		}
 	}
 	best, end := math.Inf(1), 0
-	previousScript := 0.0
 	for j, t := range b {
 		if t.sound == "" {
 			break
 		}
-		script := 0.0
-		if mode != wholeReading && t.hira {
-			script = w.Hiragana
-		}
-		curr[0] = prev[0] + w.gap(b, j, a, 0, false) + script
+		curr[0] = prev[0] + w.gap(b, j, a, 0, false)
 		low := curr[0]
 		compact := compactKana(b, j-1)
 		first, second := fullSizeKana(t.sound)
 		kuGemination := startsKuGemination(b, j-1)
 		for i := range a {
-			diag := prev[i] + w.substitution(a, b, i, j) + script
+			diag := prev[i] + w.substitution(a, b, i, j)
 			if omitHead && j == 0 && i == 1 && a[i].sound == t.sound {
-				diag = math.Min(diag, w.HeadLoss+script)
+				diag = math.Min(diag, w.HeadLoss)
 			}
 			del := curr[i] + w.gap(a, i, b, j+1, true)
-			ins := prev[i+1] + w.gap(b, j, a, i+1, false) + script
+			ins := prev[i+1] + w.gap(b, j, a, i+1, false)
 			curr[i+1] = math.Min(diag, math.Min(del, ins))
 			if j > 0 && compact == a[i].sound {
-				curr[i+1] = math.Min(curr[i+1], older[i]+w.KanaSize+previousScript+script)
+				curr[i+1] = math.Min(curr[i+1], older[i]+w.KanaSize)
 			}
 			if i > 0 && a[i].sound == second && a[i-1].sound == first {
-				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.KanaSize+script)
+				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.KanaSize)
 			}
 			if t.sound == "wa" && j > 0 && b[j-1].sound == "to" && a[i].sound == "tu" {
-				curr[i+1] = math.Min(curr[i+1], older[i]+w.TuToWa+previousScript+script)
+				curr[i+1] = math.Min(curr[i+1], older[i]+w.TuToWa)
 			}
 			if t.sound == "pa" && i > 0 && a[i-1].sound == "pu" && a[i].sound == "a" {
-				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.PuaContraction+script)
+				curr[i+1] = math.Min(curr[i+1], prev[i-1]+w.PuaContraction)
 				if j > 0 && b[j-1].sound == "^" {
-					curr[i+1] = math.Min(curr[i+1], older[i-1]+w.PuaContraction+previousScript+script)
+					curr[i+1] = math.Min(curr[i+1], older[i-1]+w.PuaContraction)
 				}
 			}
 			if kuGemination && i >= 2 && a[i-1].sound == "ku" && a[i].sound == t.sound && a[i-2].sound == b[j-2].sound {
-				curr[i+1] = math.Min(curr[i+1], older[i-1]+w.KuGemination+previousScript+script)
+				curr[i+1] = math.Min(curr[i+1], older[i-1]+w.KuGemination)
 			}
 			low = math.Min(low, curr[i+1])
 		}
@@ -654,7 +649,6 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 			low = math.Min(low, curr[last+1])
 		}
 		older, prev, curr = prev, curr, older
-		previousScript = script
 		if mode != wholeReading {
 			// A two-mora edit can still skip this row to finish at the next one.
 			if low > limit {
@@ -699,7 +693,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 }
 
 // Distance is the AllRules phonetic cost of a whole reference and observation. It omits
-// search limits and the hiragana penalty used by Find. Some edits are directional.
+// search limits. Some edits are directional.
 func (m *Matcher) Distance(reference, observed string) float64 {
 	return m.DistanceWithRules(reference, observed, AllRules)
 }

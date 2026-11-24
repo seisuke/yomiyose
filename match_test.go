@@ -569,9 +569,6 @@ func TestMaskTranscript(t *testing.T) {
 
 func TestThresholdAndWeights(t *testing.T) {
 	w := DefaultWeights()
-	if w.Hiragana != 0 {
-		t.Fatalf("default hiragana cost = %g, want 0", w.Hiragana)
-	}
 	m := mustNew(t, w, Name{Text: "サイトウミホ"})
 	text := "サトウミホ。カトウミホ。サイトウミホ"
 	for _, tc := range []struct {

@@ -36,10 +36,8 @@ func TestNamePrefixes(t *testing.T) {
 	if got := m.MaskDefault(ordinaryText, "■"); got != "お■加えてください。■ウコさんも来ます。" {
 		t.Errorf("matches without a name boundary: %q", got)
 	}
-	w.Hiragana = .125
-	m = mustNew(t, w, Name{Text: name})
-	if hits := m.FindDefault("おさとう。"); len(hits) != 1 || hits[0].Cost != .375 {
-		t.Errorf("configured script cost for the common noun: %+v", hits)
+	if hits := m.FindDefault("おさとう。"); len(hits) != 1 || hits[0].Cost != 0 {
+		t.Errorf("normalized prefix cost: %+v", hits)
 	}
 }
 
