@@ -442,11 +442,11 @@ func TestObservedHaAsWa(t *testing.T) {
 	} {
 		reference := tokenize(tc.reference + "ジェイムズ")
 		observed := tokenize("エルモハジェームズ")
-		if got := rules.substitution(reference, observed, 3, 3); got != w.Other {
+		if got := rules.substitution(reference, observed, 3, 3, false); got != w.Other {
 			t.Errorf("katakana ハ: got %g, want %g", got, w.Other)
 		}
 		observed[3].hira = true
-		if got := rules.substitution(reference, observed, 3, 3); got != tc.want {
+		if got := rules.substitution(reference, observed, 3, 3, false); got != tc.want {
 			t.Errorf("hiragana source flag: got %g, want %g", got, tc.want)
 		}
 	}

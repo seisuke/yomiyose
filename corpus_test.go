@@ -155,6 +155,9 @@ func TestJapaneseFullNameMasks(t *testing.T) {
 		}
 	}
 	roster := mustNew(t, DefaultWeights(), names...)
+	w := DefaultWeights()
+	w.MatchSubstrings = true
+	withParts := mustNew(t, w, names...)
 	for _, row := range rows[1:] {
 		variation, name, observed, expected := row[0], row[1], row[2], row[3]
 		requireKatakanaNames(t, name, observed)
@@ -170,6 +173,17 @@ func TestJapaneseFullNameMasks(t *testing.T) {
 		}
 		if withRoster := roster.MaskDefault(input, "■"); withRoster != got {
 			t.Errorf("%s → %s: roster masked %q, single registration masked %q", name, observed, withRoster, got)
+		}
+		if masked := mustNew(t, w, Name{Text: name}).MaskDefault(input, "■"); masked != got {
+			t.Errorf("single with substrings: %s: %s", name, masked)
+		}
+		wantParts := expected
+		switch observed {
+		case "オオノマドカ", "ヤマモリケンタ", "サクライユウコ":
+			wantParts = "■"
+		}
+		if masked := withParts.MaskDefault(input, "■"); masked != prefix+wantParts+suffix {
+			t.Errorf("MatchSubstrings: %s → %s: %q, want %q", name, observed, masked, prefix+wantParts+suffix)
 		}
 		n := byVariation[variation]
 		switch got {

@@ -165,3 +165,71 @@ func TestPrefixOptionsValidation(t *testing.T) {
 		*field = 1
 	}
 }
+
+func TestNameSubstrings(t *testing.T) {
+	w := DefaultWeights()
+	w.MatchSubstrings = true
+	m := mustNew(t, w, Name{Text: "山田太郎", Readings: []string{"ヤマダタロウ"}})
+	for _, tc := range []struct{ text, span string }{
+		{"受付：ヤマダ太郎さん", "ヤマダ"},
+		{"🎤山田タローさん", "タロー"},
+		{"マダタ。", "マダタ"},
+		{"タロウ。", "タロウ"},
+		{"ヤマダタロウ。", "ヤマダタロウ"},
+	} {
+		hits := m.FindDefault(tc.text)
+		if len(hits) != 1 || tc.text[hits[0].Start:hits[0].End] != tc.span || hits[0].Cost != 0 || hits[0].NameIndex != 0 {
+			t.Errorf("%s: %+v", tc.text, hits)
+		}
+	}
+	for _, text := range []string{"ロウ。", "山田。", "マダ。タ"} {
+		if hits := m.FindDefault(text); len(hits) != 0 {
+			t.Errorf("%s: %+v", text, hits)
+		}
+	}
+	m = mustNew(t, w, Name{Text: "ヤマダカトウ"})
+	if got := m.Find("ガトウ。", .25); len(got) != 1 || got[0].Cost != .25 {
+		t.Errorf("medial voicing: %+v", got)
+	}
+	if got := m.Find("サトウ。", .25); len(got) != 0 {
+		t.Errorf("initial discount inside name: %+v", got)
+	}
+}
+
+func TestSubstringInitialConsonants(t *testing.T) {
+	w := DefaultWeights()
+	w.MatchSubstrings = true
+	for _, tc := range []struct {
+		name, observed string
+		cost           float64
+	}{
+		{"カトウミホ", "サトウ", .25},
+		{"ハマダケイコ", "カマダ", .25},
+		{"ニシダアヤ", "ヒシダ", .25},
+		{"モリモトタロウ", "ホリモ", .25},
+		{"キョウダミホ", "ショウダ", .25},
+		{"カトウミホ", "アトウ", .5},
+		{"タカハシミホ", "ナカハ", .5},
+	} {
+		m := mustNew(t, w, Name{Text: tc.name})
+		input := "受付「" + tc.observed + "」"
+		hits := m.FindDefault(input)
+		if len(hits) != 1 || hits[0].Cost != tc.cost || input[hits[0].Start:hits[0].End] != tc.observed || m.MaskDefault(input, "■") != "受付「■」" {
+			t.Errorf("%s → %s: %+v", tc.name, tc.observed, hits)
+		}
+		if got := m.Find(input, tc.cost-.01); len(got) != 0 {
+			t.Errorf("%s → %s below threshold: %+v", tc.name, tc.observed, got)
+		}
+	}
+}
+
+func TestSubstringPrefersLowerCostOverlap(t *testing.T) {
+	w := DefaultWeights()
+	w.MatchSubstrings = true
+	m := mustNew(t, w, Name{Text: "モリモトタロウ"})
+	const input = "ホリモト。"
+	hits := m.FindDefault(input)
+	if len(hits) != 1 || hits[0].Cost != 0 || input[hits[0].Start:hits[0].End] != "リモト" || m.MaskDefault(input, "■") != "ホ■。" {
+		t.Errorf("overlapping parts: %+v", hits)
+	}
+}

@@ -51,6 +51,7 @@ type Weights struct {
 
 	MoraLimits *MoraLimits // nil uses the default length bands; copied when creating a matcher
 
+	MatchSubstrings        bool    // also search contiguous parts of a reading, including its end
 	MatchPrefixes          bool    // also search for proper prefixes of a registered reading
 	MinPrefixChars         int     // minimum normalized kana characters on both sides; 3, 4 or 5
 	PrefixMaxCost          float64 // overall prefix ceiling, including five-character matches
@@ -184,8 +185,8 @@ func New(names []Name, w Weights) (*Matcher, error) {
 // NewScoped compiles a list with an explicit rule set per name. The zero rule
 // set is AllRules. The matcher never guesses a rule set from the spelling.
 func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
-	if w.MatchPrefixes && (w.MinPrefixChars < 3 || w.MinPrefixChars > maxPrefixChars) {
-		return nil, fmt.Errorf("yomiyose: MinPrefixChars must be between 3 and 5 when matching prefixes")
+	if (w.MatchPrefixes || w.MatchSubstrings) && (w.MinPrefixChars < 3 || w.MinPrefixChars > maxPrefixChars) {
+		return nil, fmt.Errorf("yomiyose: MinPrefixChars must be between 3 and 5 when matching parts of names")
 	}
 	if w.MoraLimits == nil {
 		w.MoraLimits = DefaultWeights().MoraLimits
@@ -369,7 +370,7 @@ func matchingRDContext(a, b []unit, i, j int) bool {
 	return true
 }
 
-func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
+func (w *ruleWeights) substitution(a, b []unit, i, j int, interior bool) float64 {
 	x, y := a[i].sound, b[j].sound
 	if x == y {
 		return 0
@@ -392,7 +393,7 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	if bvPartner[x] == y {
 		cost = math.Min(cost, w.BV)
 	}
-	if i == 0 && j == 0 {
+	if !interior && i == 0 && j == 0 {
 		if slices.Contains(initialConfusions[x], y) {
 			cost = math.Min(cost, w.InitialConfusion)
 		}
@@ -415,7 +416,7 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	if rdPartner[x] == y && matchingRDContext(a, b, i, j) {
 		cost = math.Min(cost, w.RD)
 	}
-	if i > 0 && j > 0 {
+	if (i > 0 && j > 0) || (interior && i == 0 && j == 0) {
 		if voicingPartner[x] == y || w.scope != JapaneseRules && foreignVoicingPartner[x] == y {
 			cost = math.Min(cost, w.MedialVoicing)
 		}
@@ -588,6 +589,7 @@ const (
 	wholeReading alignmentMode = iota
 	searchFullName
 	searchNamePrefix
+	searchInterior
 )
 
 func (w *ruleWeights) withinLengthLimit(moras int, exact bool, cost float64) bool {
@@ -605,7 +607,7 @@ func (w *ruleWeights) withinLengthLimit(moras int, exact bool, cost float64) boo
 func (w *ruleWeights) namePrefixCost(a []unit, row []float64, observedChars, observedMoras int) float64 {
 	best := math.Inf(1)
 	chars, moras := 0, 0
-	for i, t := range a[:len(a)-1] {
+	for i, t := range a {
 		width := t.kanaChars()
 		if width == 0 {
 			continue
@@ -634,6 +636,11 @@ func (w *ruleWeights) namePrefixCost(a []unit, row []float64, observedChars, obs
 // align compares one reading to text beginning at a fixed position. Full names
 // prefer the cheapest endpoint; partial names prefer the longest within budget.
 func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode alignmentMode, omitHead bool) (int, float64) {
+	partial := mode == searchNamePrefix || mode == searchInterior
+	eligible := a
+	if mode == searchNamePrefix {
+		eligible = a[:len(a)-1]
+	}
 	width := len(a) + 1
 	older, prev, curr := rows[:width], rows[width:2*width], rows[2*width:]
 	prev[0] = 0
@@ -658,7 +665,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 		first, second := fullSizeKana(t.sound)
 		kuGemination := startsKuGemination(b, j-1)
 		for i := range a {
-			diag := prev[i] + w.substitution(a, b, i, j)
+			diag := prev[i] + w.substitution(a, b, i, j, mode == searchInterior)
 			if omitHead && j == 0 && i == 1 && a[i].sound == t.sound {
 				diag = math.Min(diag, w.HeadLoss)
 			}
@@ -685,7 +692,7 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 			}
 			low = math.Min(low, curr[i+1])
 		}
-		if canDropTail && mode != searchNamePrefix && (mode == wholeReading || !tailAfterMarker(b, j+1, a[last].sound)) {
+		if canDropTail && !partial && (mode == wholeReading || !tailAfterMarker(b, j+1, a[last].sound)) {
 			curr[last+1] = math.Min(curr[last+1], curr[last]+w.TailLoss)
 			low = math.Min(low, curr[last+1])
 		}
@@ -706,14 +713,14 @@ func (w *ruleWeights) align(a, b []unit, rows []float64, limit float64, mode ali
 			sameSounds = sameSounds && j < len(a) && a[j].sound == t.sound
 			// Test each endpoint independently. A rejected two-mora prefix
 			// can still lead to an eligible three-mora match.
-			if mode == searchNamePrefix {
+			if partial {
 				width := t.kanaChars()
 				observedChars += width
 				if observedChars > maxPrefixChars {
 					break
 				}
 				if observedChars >= w.MinPrefixChars && width > 0 {
-					cost := w.namePrefixCost(a, prev, observedChars, observedLength)
+					cost := w.namePrefixCost(eligible, prev, observedChars, observedLength)
 					if cost <= limit && !math.IsInf(cost, 1) {
 						best, end = cost, j+1
 					}
@@ -846,7 +853,7 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 		for _, form := range name.forms {
 			w := m.rules[name.rules].forReading(form)
 			rows := make([]float64, 3*(len(form)+1))
-			find := func(hits []Match, limit float64, mode alignmentMode) []Match {
+			find := func(form []unit, hits []Match, limit float64, mode alignmentMode) []Match {
 				omitHead := mode == searchFullName && w.HeadLoss <= limit && canOmitHead(form)
 				check := func(i int) {
 					end, c := w.align(form, tokens[i:], rows, limit, mode, omitHead)
@@ -854,7 +861,7 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 						hits = append(hits, Match{name.text, index, tokens[i].start, tokens[i+end-1].end, c})
 					}
 				}
-				if limit < w.Other {
+				if limit < w.Other && mode != searchInterior {
 					for _, sound := range w.initialSounds(form, limit, omitHead) {
 						for _, i := range positions[sound] {
 							check(i)
@@ -869,9 +876,29 @@ func (m *Matcher) Find(text string, maxCost float64) []Match {
 				}
 				return hits
 			}
-			full = find(full, maxCost, searchFullName)
-			if w.MatchPrefixes && len(form) > 1 {
-				partial = find(partial, min(maxCost, w.PrefixMaxCost), searchNamePrefix)
+			full = find(form, full, maxCost, searchFullName)
+			limit := min(maxCost, w.PrefixMaxCost)
+			kanaParts := w.MatchSubstrings && !slices.ContainsFunc(form, func(t unit) bool {
+				return countsTowardLength(t) && !phonetic(t.sound)
+			})
+			if (w.MatchPrefixes || kanaParts) && len(form) > 1 {
+				partial = find(form, partial, limit, searchNamePrefix)
+			}
+			if kanaParts {
+				for start := 1; start < len(form); start++ {
+					if !phonetic(form[start].sound) {
+						continue
+					}
+					// Keep one mora of right context for phonetic rules.
+					end, chars := start, 0
+					for end < len(form) && chars <= maxPrefixChars {
+						chars += form[end].kanaChars()
+						end++
+					}
+					if chars >= w.MinPrefixChars {
+						partial = find(form[start:end], partial, limit, searchInterior)
+					}
+				}
 			}
 		}
 		first := len(result)
