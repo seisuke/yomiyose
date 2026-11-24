@@ -38,7 +38,8 @@ type Weights struct {
 	RiRu                 float64 // リ/ル under foreign-name rules
 	RD                   float64 // contextual ラ/ダ, リ/ディ, レ/デ and ロ/ド
 	MedialVoicing        float64 // voiced/unvoiced pairs after the first mora
-	InitialKS            float64 // same vowel with k/s in the first mora
+	InitialConfusion     float64 // reported Japanese name onset pairs
+	InitialConsonant     float64 // Japanese onset substitution in the first mora
 	MedialLoss           float64 // one missing interior mora of the registered reading
 	TailLoss             float64 // one missing final ordinary mora of the reference
 	HeadLoss             float64 // Find/Mask: omit the first mora if six vowel-bearing moras remain
@@ -78,7 +79,7 @@ func DefaultWeights() Weights {
 		ForeignLongInsertion: 0.5, ForeignLongDeletion: 0.5,
 		TiChi: 0.25, TuToWa: 0.25, PuaContraction: 0.25, KanaSize: 0.25, ShiShu: 0.5, RiRu: 0.5, VowelLoss: 0.25, Geminate: 0.25,
 		GlideAfterOU: 0.25, HaAsWa: 0.125, KuGemination: 0.5, RD: 0.5,
-		BV: 0.25, MedialVoicing: 0.25, InitialKS: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
+		BV: 0.25, MedialVoicing: 0.25, InitialConfusion: 0.25, InitialConsonant: 0.5, MedialLoss: 1, TailLoss: 0.75, HeadLoss: 1, Other: 1,
 		TwoMoraMaxCost: 1, ExactSingleMora: true,
 		LimitByMoraCount: true, MoraLimits: &MoraLimits{UpTo6: 1.5, From7To9: 1.75, From10: 2},
 		MinPrefixChars: 3, ThreeCharPrefixMaxCost: 0.75, FourCharPrefixMaxCost: 1, PrefixMaxCost: 1.25,
@@ -121,7 +122,7 @@ func (w Weights) forRuleSet(scope RuleSet) ruleWeights {
 		w.TuToWa, w.PuaContraction = off, off
 		w.RiRu, w.RD = off, off
 	case ForeignRules:
-		w.VowelLoss, w.InitialKS, w.KuGemination = off, off, off
+		w.VowelLoss, w.InitialConfusion, w.InitialConsonant, w.KuGemination = off, off, off, off
 		w.RepeatedVowelPenalty = 0
 	}
 	return ruleWeights{Weights: w, scope: scope}
@@ -196,7 +197,7 @@ func NewScoped(names []ScopedName, w Weights) (*Matcher, error) {
 		w.MoraLimits.UpTo6, w.MoraLimits.From7To9, w.MoraLimits.From10, w.PrefixMaxCost, w.ThreeCharPrefixMaxCost, w.FourCharPrefixMaxCost,
 		w.TuToWa, w.PuaContraction, w.ForeignLongInsertion, w.ForeignLongDeletion,
 		w.LongInsertion, w.LongDeletion, w.RepeatedVowelPenalty, w.TiChi, w.KanaSize, w.VowelLoss, w.GlideAfterOU, w.HaAsWa, w.Geminate,
-		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialKS, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.TwoMoraMaxCost} {
+		w.BV, w.ShiShu, w.RiRu, w.RD, w.MedialVoicing, w.InitialConfusion, w.InitialConsonant, w.KuGemination, w.MedialLoss, w.TailLoss, w.HeadLoss, w.Other, w.TwoMoraMaxCost} {
 		if v < 0 || math.IsNaN(v) {
 			return nil, fmt.Errorf("yomiyose: weights must be nonnegative")
 		}
@@ -391,8 +392,13 @@ func (w *ruleWeights) substitution(a, b []unit, i, j int) float64 {
 	if bvPartner[x] == y {
 		cost = math.Min(cost, w.BV)
 	}
-	if i == 0 && j == 0 && ksPartner[x] == y {
-		cost = math.Min(cost, w.InitialKS)
+	if i == 0 && j == 0 {
+		if slices.Contains(initialConfusions[x], y) {
+			cost = math.Min(cost, w.InitialConfusion)
+		}
+		if group := initialGroup[x]; group != nil && slices.Contains(group, y) {
+			cost = math.Min(cost, w.InitialConsonant)
+		}
 	}
 	if tiChiPartner[x] == y {
 		cost = math.Min(cost, w.TiChi)
@@ -456,7 +462,42 @@ var foreignVoicingPartner = partners("je/she ba/pa")
 var shiShuPartner = partners("shi/shu")
 var riRuPartner = partners("ri/ru")
 var rdPartner = partners("ra/da ri/di re/de ro/do")
-var ksPartner = partners("ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho")
+
+// Each group shares a vowel and a plain or palatalized Japanese mora shape.
+var initialGroup = func() map[string][]string {
+	groups := make(map[string][]string)
+	for _, row := range []string{
+		"a ka ga sa za ta da na ha ba pa ma ya ra wa",
+		"i ki gi shi ji chi ni hi bi pi mi ri",
+		"u ku gu su zu tsu nu fu bu pu mu yu ru",
+		"e ke ge se ze te de ne he be pe me re",
+		"o ko go so zo to do no ho bo po mo yo ro",
+		"kya gya sha ja cha nya hya bya pya mya rya",
+		"kyu gyu shu ju chu nyu hyu byu pyu myu ryu",
+		"kyo gyo sho jo cho nyo hyo byo pyo myo ryo",
+	} {
+		group := strings.Fields(row)
+		for _, sound := range group {
+			groups[sound] = group
+		}
+	}
+	return groups
+}()
+
+var initialConfusions = func() map[string][]string {
+	result := make(map[string][]string)
+	for _, pairs := range []string{
+		"ka/sa ki/shi ku/su ke/se ko/so kya/sha kyu/shu kyo/sho",
+		"ha/ka hi/ki fu/ku he/ke ho/ko hya/kya hyu/kyu hyo/kyo",
+		"na/ha ni/hi nu/fu ne/he no/ho nya/hya nyu/hyu nyo/hyo",
+		"ma/ha mi/hi mu/fu me/he mo/ho mya/hya myu/hyu myo/hyo",
+	} {
+		for sound, partner := range partners(pairs) {
+			result[sound] = append(result[sound], partner)
+		}
+	}
+	return result
+}()
 
 // One compact mora aligns to both sounds of its full-size spelling in one edit.
 var kanaSizePairs = [...]struct{ compact, first, second string }{
@@ -756,8 +797,15 @@ func (w Weights) initialSounds(form []unit, limit float64, omitHead bool) []stri
 	if w.RD <= limit && len(form) >= 3 {
 		add(rdPartner[first])
 	}
-	if w.InitialKS <= limit {
-		add(ksPartner[first])
+	if w.InitialConfusion <= limit {
+		for _, sound := range initialConfusions[first] {
+			add(sound)
+		}
+	}
+	if w.InitialConsonant <= limit {
+		for _, sound := range initialGroup[first] {
+			add(sound)
+		}
 	}
 	return sounds
 }

@@ -47,17 +47,17 @@ func TestPrefixLimits(t *testing.T) {
 	w.MatchPrefixes = true
 	m := mustNew(t, w, Name{Text: name})
 	const text = "🎤カトウさん。"
-	hits := m.Find(text, .75)
-	if len(hits) != 1 || hits[0].Cost != .75 || text[hits[0].Start:hits[0].End] != "カトウ" {
+	hits := m.Find(text, .5)
+	if len(hits) != 1 || hits[0].Cost != .5 || text[hits[0].Start:hits[0].End] != "カトウ" {
 		t.Fatalf("inclusive limit: %+v", hits)
 	}
-	if got := m.Mask(text, .74, "■"); got != text {
+	if got := m.Mask(text, .49, "■"); got != text {
 		t.Errorf("caller limit: %q", got)
 	}
 	if got := m.Distance(name, "カトウ"); got <= .75 {
 		t.Errorf("whole-reading distance: %g", got)
 	}
-	w.PrefixMaxCost = .74
+	w.PrefixMaxCost = .49
 	if got := mustNew(t, w, Name{Text: name}).MaskDefault(text, "■"); got != text {
 		t.Errorf("configured cost: %q", got)
 	}
@@ -67,7 +67,7 @@ func TestPrefixLimits(t *testing.T) {
 		t.Errorf("configured minimum: %q", got)
 	}
 	w.MinPrefixChars, w.PrefixMaxCost = 3, 1
-	w.MoraLimits.UpTo6 = .74
+	w.MoraLimits.UpTo6 = .49
 	if got := mustNew(t, w, Name{Text: name}).MaskDefault(text, "■"); got != text {
 		t.Errorf("three-mora cap: %q", got)
 	}
@@ -88,7 +88,7 @@ func TestPrefixAndFullNameOverlap(t *testing.T) {
 	// Only the Japanese-scoped alias can combine the two cheap edits in カトウ.
 	// Both complete readings match the second mention by dropping the final mora.
 	if len(hits) != 3 || hits[0].NameIndex != 1 || hits[0].Name != "イシイカオリ" ||
-		text[hits[0].Start:hits[0].End] != "カトウ" || hits[0].Cost != .75 {
+		text[hits[0].Start:hits[0].End] != "カトウ" || hits[0].Cost != .5 {
 		t.Fatalf("scoped and aliased hits: %+v", hits)
 	}
 	for _, hit := range hits[1:] {
@@ -122,7 +122,7 @@ func TestPrefixCharacterBands(t *testing.T) {
 		name, text string
 		cost       float64
 	}{
-		{"サイトウユウスケ", "カトウ", .75},
+		{"サイトウユウスケ", "カトウ", .5},
 		{"タカハシリョウタ", "タケハシ", 1},
 		{"オオバヤシタカヒロ", "オイハヤシ", 1.25},
 	} {

@@ -16,6 +16,32 @@ func mustNew(t *testing.T, w Weights, names ...Name) *Matcher {
 	return m
 }
 
+func TestInitialConsonant(t *testing.T) {
+	w := DefaultWeights()
+	w.InitialConfusion = .125
+	for _, pair := range [][2]string{
+		{"カトウミホ", "サトウミホ"},
+		{"ハマダケイコ", "カマダケイコ"},
+		{"ニシダアヤ", "ヒシダアヤ"},
+		{"モリモトタロウ", "ホリモトタロウ"},
+		{"キョウダミホ", "ショウダミホ"},
+	} {
+		for _, dir := range [][2]string{pair, {pair[1], pair[0]}} {
+			ref, obs := dir[0], dir[1]
+			m := mustNew(t, w, Name{Text: ref})
+			if got := m.DistanceWithRules(ref, obs, JapaneseRules); got != w.InitialConfusion {
+				t.Errorf("%s -> %s: distance %g", ref, obs, got)
+			}
+			if got := m.DistanceWithRules(ref, obs, ForeignRules); got != w.Other {
+				t.Errorf("%s -> %s: foreign distance %g", ref, obs, got)
+			}
+			if got := m.Mask("受付の"+obs+"さん", w.InitialConfusion, "■"); got != "受付の■さん" {
+				t.Errorf("%s -> %s: masked %q", ref, obs, got)
+			}
+		}
+	}
+}
+
 func TestRuleSetDistances(t *testing.T) {
 	w := DefaultWeights()
 	w.GlideAfterOU = .5
@@ -25,9 +51,15 @@ func TestRuleSetDistances(t *testing.T) {
 		all, japanese, foreign float64
 	}{
 		{"イシイカオリ", "イシーカオリ", 0, 0, 0},
+		{"ナカハシミホ", "タカハシミホ", .5, .5, 1},
+		{"アトウミホ", "カトウミホ", .5, .5, 1},
+		{"カトウミホ", "アトウミホ", .5, .5, 1},
+		{"シャカノアヤ", "サカノアヤ", 1, 1, 1},
+		{"タナカミホ", "タナサミホ", 1, 1, 1},
+		{"ハマダケイコ", "キマダケイコ", 1, 1, 1},
 		{"ヤマザキケント", "ヤマサキケント", .25, .25, .25},
 		{"サイトウミホ", "サトウミホ", .25, .25, 1},
-		{"カトウミホ", "サトウミホ", .5, .5, 1},
+		{"カトウミホ", "サトウミホ", .25, .25, 1},
 		{"オオノユウスケ", "オノユースケ", .25, .25, .75},
 		{"サトウレナ", "サトウレーナ", .75, .75, .75},
 		{"サトウレーナ", "サトウレナ", .75, .75, .75},
@@ -304,7 +336,7 @@ func TestScopedFindAndMask(t *testing.T) {
 		index int
 		text  string
 		cost  float64
-	}{{0, "サトウミホ", .5}, {3, "ウイリアム・モーリス", .25}, {4, "オノデービット", .5}}
+	}{{0, "サトウミホ", .25}, {3, "ウイリアム・モーリス", .25}, {4, "オノデービット", .5}}
 	hits := m.Find(input, .5)
 	if len(hits) != len(want) {
 		t.Fatalf("Find returned %+v, want %d hits", hits, len(want))
@@ -335,8 +367,8 @@ func TestPhoneticRules(t *testing.T) {
 		{"ヤマモトユウスケ", "ヤマモトユースケ", 0},
 		{"イシーカオリ", "イシイカオリ", 0},
 		{"キムラセイスケ", "キムラセースケ", 0}, {"サトウミホ", "サトーミホ", 0},
-		{"サイトウミホ", "サトウミホ", .25}, {"サトウミホ", "サイトウミホ", .25}, {"カトタクミ", "サトタクミ", .5},
-		{"サイトウミホ", "カトウミホ", .75}, {"イシダリョウタ", "イシダリョウ", .75},
+		{"サイトウミホ", "サトウミホ", .25}, {"サトウミホ", "サイトウミホ", .25}, {"カトタクミ", "サトタクミ", .25},
+		{"サイトウミホ", "カトウミホ", .5}, {"イシダリョウタ", "イシダリョウ", .75},
 		{"アントニオヴィバルディ", "アントニオビバルディ", .25}, {"アントニオヴィヴァルディ", "アントニオビバルディ", .5},
 		{"デイビットマッキー", "デービットマッキー", 0}, {"デイビットマッキー", "デビットマッキー", .25},
 		{"デビットマッキー", "デビトマッキー", .25}, {"デビトマッキー", "デビットマッキー", .25}, {"ミシェルモラン", "ミッシェルモラン", .25},
@@ -645,7 +677,7 @@ func ExampleMatcher_Find() {
 func TestTunableRulesAndSearchFallback(t *testing.T) {
 	w := DefaultWeights()
 	w.EiSpelling, w.OuSpelling = .125, .5
-	w.Geminate, w.InitialKS, w.TailLoss = .5, 1, .875
+	w.Geminate, w.InitialConfusion, w.InitialConsonant, w.TailLoss = .5, 1, 1, .875
 	m := mustNew(t, w, Name{Text: "イシイ カオリ", Readings: []string{"イシーカオリ"}}, Name{Text: "サトウミホ"})
 	for _, tc := range []struct {
 		a, b string
