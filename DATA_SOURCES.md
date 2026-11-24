@@ -1,6 +1,6 @@
 # テストデータの出典
 
-テストデータごとに、出典、用例の選び方、利用条件を示す。照合規則の設計に使った文献も併記する。どの名前をどこまでマスクできたかは [EVALUATION.md](EVALUATION.md)、ライブラリの使い方は [README.md](README.md) を参照。
+各データの出典・抽出条件・利用条件と、照合規則の参考文献をまとめた。マスク結果は [EVALUATION.md](EVALUATION.md)、ライブラリの使い方は [README.md](README.md) を参照。
 
 | ファイル | 収録内容 | 名前の表記を得た方法 |
 |---|---|---|
@@ -23,9 +23,9 @@ Goモジュールのソース配布物には上記のTSVが含まれる。TSVを
 
 ## 日本人名の発話別STT出力
 
-Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-v3` のCSVを使用した。配布元のコミットは `649fe3d1427d9ad6027940e29e7651fd516ea590`。参照した行数はJSUT basic5000が5,000、ReazonSpeech testが5,263、Common Voice 8日本語が4,483。採用した発話のCSVの `id` をテストデータの `utterance` に記録した。[JSUTの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[ReazonSpeechの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[Common Voice 8の発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.common_voice_8_0.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
+Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-v3` のCSVを使用した。配布元のコミットは `649fe3d1427d9ad6027940e29e7651fd516ea590`。参照した行数はJSUT basic5000が5,000、ReazonSpeech testが5,263、Common Voice 8日本語が4,483。テストデータの `utterance` は、元のCSVの発話 `id` に対応する。[JSUTの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[ReazonSpeechの発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.reazonspeech_test.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)・[Common Voice 8の発話別CSV](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.common_voice_8_0.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
 
-次の2発話では出力に漢字がある。読みの末尾が変わった場合のマスク範囲をテストするため、登録読みと出力の読みを人手で付けた。元のCSVの表記と、テストで仮定した読みの対応を示す。[かなの入力と期待マスク](testdata/japanese_asr_names.tsv)・[山﨑賢人の公式プロフィール](https://www.stardust.co.jp/talent/section2/yamazakikento/)
+次の2発話では氏名が漢字で出力された。語尾が変わった場合のマスク範囲を調べるため、正解文と認識結果の両方に人手で読みを付けた。[かなの入力と期待マスク](testdata/japanese_asr_names.tsv)・[山﨑賢人の公式プロフィール](https://www.stardust.co.jp/talent/section2/yamazakikento/)
 
 | 発話ID | 正解文の表記 → Whisperの表記 | 登録読み → テストで仮定した読み |
 |---|---|---|
@@ -41,7 +41,7 @@ Kotoba Technologiesが公開した評価結果のうち、`openai/whisper-large-
 | Hara（2016）、日本人のフルネームの読み上げ | 姓末と名頭で異なる母音が続くフルネーム20通りを16人が各3回発声し、960発声のうち840件を分析した。連続する母音の平均持続時間は姓名の境界で約211 ms、別に測った実在語の内部で約270 msだった。 | 姓名を続けて言ったときに境目の母音がどう聞こえうるかを調べる資料。話速は統制しておらず、持続時間から文字の脱落率は推定できない。使用した姓名は付録2、計測値は表8。[Newcastle大学の博士論文](https://theses.ncl.ac.uk/jspui/handle/10443/3420) |
 | 国立国語研究所、CSJの長母音の短呼 | 「本当」を「ホント」と短く発音する例を含む。短単位内の長母音の短呼率は語頭0.09%、語中3.77%、語末4.71%だった。 | 長音の位置を分けて調べる根拠になる。この集計には一般語が含まれ、入力が姓名連結なら姓末がどこかは分からない。[CSJ予備的分析 §6-4](https://clrd.ninjal.ac.jp/csj/misc/preliminary/j6_2.html) |
 
-これらの資料の観測対象は人の発音。GPT Liveがカタカナで確定したフルネームの欠落例は今回確認できなかった。これらの発音研究で調べた件数は、STT出力を使ったテストの集計から除いた。`VowelLoss` の0.25は利用例「サイトウ／サトウ」用の設定値で、この発話研究から推定した重みではない。
+STT出力のテスト件数には、発音研究で調べた件数を含めていない。調べた範囲では、GPT Liveの確定出力でカタカナのフルネームの一部が欠けた例は見つからなかった。`VowelLoss` の0.25は利用例「サイトウ／サトウ」用の設定値で、この発話研究から推定した重みではない。
 
 ### 日本人の姓にあるハとワ
 
@@ -95,7 +95,7 @@ ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Wh
 
 音声と正解文の元データはGoogleのFLEURS日本語テストセット（CC BY 4.0）。認識結果は `yukobayashi500/ja-asr-leaderboard-2026` の `fleurs_outputs.jsonl` を使った。このファイルには読み上げ650発話に対する11モデル、計7,150行の出力がある。使用ファイルのSHA-256は `7c566d09af0ef0dfa3f36faea08e031ad974b452c8a8cd4bd2b2d6dbd4f7f46e`。[Google FLEURS](https://huggingface.co/datasets/google/fleurs)・[発話別結果の配布元](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[取得したJSONL](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026/resolve/main/fleurs_outputs.jsonl)
 
-比較できるフルネームがあり、既存の規則で拾える例と取りこぼす例を含む12行を選んだ。`utterance` は配布元が付けた `id`、`model` は同じ行にあるモデル識別子。各行の登録名は `reference`、観測名は `hypothesis` の部分文字列と照合して確認した。当初の12行はWhisper large-v3-turbo、large-v3、medium、Kotoba-Whisper v2.0の出力。後に、同じ10人を7,150出力の全文で照合し、長音コストの変更でマスク結果が変わった4行を追記した。いずれも同じJSONLにある別モデルの出力。周囲の文だけをテスト用に統一した。マスク期待値の `=` は観測名がそのまま残ることを示す。音声の聞き直し、独立の話者数の確認、この標本からの発生率の推定は行っていない。
+比較できるフルネームがあり、既存の規則で拾える例と取りこぼす例を含む12行を選んだ。`utterance` は配布元が付けた `id`、`model` は同じ行にあるモデル識別子。各行の登録名は `reference`、観測名は `hypothesis` の部分文字列と照合して確認した。当初の12行はWhisper large-v3-turbo、large-v3、medium、Kotoba-Whisper v2.0の出力。後に、同じ10人を7,150出力の全文で照合し、長音コストの変更でマスク結果が変わった4行を追記した。追加分も同じJSONLの別モデルの出力で、氏名の前後の文だけをテスト用にそろえた。マスク期待値の `=` は観測名がそのまま残ることを示す。音声の聞き直し、独立の話者数の確認、この標本からの発生率の推定は行っていない。
 
 ### ラ行と D・T の聞き違い
 
@@ -115,11 +115,11 @@ ReazonSpeech の `e62757672dfed.flac` では正解の「キム・シウ」が Wh
 
 `fleurs-0453` の anime-whisper 出力「ディ・シェン・ルーン」も、長音の落ちた語頭の回帰例として収録した。かなでフルネームが残る `fleurs-0162`（Whisper large-v3-turbo）と `fleurs-0603`（anime-whisper）も見落としを検証する行として収録した。TSV の `default_mask` は既定の長さ別上限での期待マスク。`max_1_5_mask` は上限をさらに `1.5` に絞った場合の期待マスク。この21件では既定の長さ別上限で標準設定と `ForeignRules` が同じ結果になり、両方を検証している。語中の「ロ」、末尾の「フィ」などを削った短縮例は別途Goテストで作成し、公開出力の件数から除外した。
 
-フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者では語頭の照合を、後者ではラ行のほかにも音が変わる場合の取りこぼしを検証する。タ行については今回の抽出でタ行との置換だけで説明できるフルネームの例を確認できず、資料にとどめた。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
+フルネームがある `fleurs-0453` と `fleurs-0333` を評価用TSVに追記した。前者では語頭の照合を、後者ではラ行のほかにも音が変わる場合の取りこぼしを検証する。ラ行とタ行の置換だけで説明できるフルネームは見つからず、一般語の例を参考資料に残した。[発話別の評価結果](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)・[追加した表記対](testdata/fleurs_names.tsv)
 
 ### トゥプアの異表記と発音資料
 
-サモアの独立運動指導者の綴りは **Tupua Tamasese Lealofi III**。FLEURS 日本語の `fleurs-0332`、`0333`、`0334` は正解文が同一の3発話である。Whisper large-v3-turbo の先頭は順に「トゥプア」「トワッパー」「トゥプア」。中央の発話では Whisper large-v3 が「トゥアッパー」、Whisper medium が「トワッパー」と出力した。中央の発話については、同じ録音に対する各モデルの出力を比較している。この結果だけでは、話者がどう発音したか、別の人名で同じ揺れがどの程度起きるかは判断できない。[ニュージーランド公文書館](https://www.archives.govt.nz/discover-our-stories/the-rise-of-the-mau-and-the-fall-of-colonial-rule-in-samoa)・[各モデルの出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)
+サモアの独立運動指導者の綴りは **Tupua Tamasese Lealofi III**。FLEURS 日本語の `fleurs-0332`、`0333`、`0334` は正解文が同一の3発話である。Whisper large-v3-turbo の先頭は順に「トゥプア」「トワッパー」「トゥプア」。中央の発話では、同じ録音に対して Whisper large-v3 は「トゥアッパー」、Whisper medium は「トワッパー」と出力した。この結果だけでは、話者がどう発音したか、別の人名で同じ揺れがどの程度起きるかは判断できない。[ニュージーランド公文書館](https://www.archives.govt.nz/discover-our-stories/the-rise-of-the-mau-and-the-fall-of-colonial-rule-in-samoa)・[各モデルの出力](https://huggingface.co/datasets/yukobayashi500/ja-asr-leaderboard-2026)
 
 - **トゥ／ト**。文化庁は同じ人名の表記例として「ハチャトゥリヤン／ハチャトリヤン」を挙げる。STTでも JSUT `BASIC5000_3315.wav` で「シャクロヴィートゥイ → シャクロビートイ」があり、ヴィ／ビとトゥ／トの2か所が対応する。[文化庁「外来語の表記」第6項](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/gairai/honbun05.html)・[JSUTのWhisper large-v3出力](https://github.com/kotoba-tech/kotoba-whisper/blob/649fe3d1427d9ad6027940e29e7651fd516ea590/eval_pipeline/model-whisper-large-v3.dataset-ja_asr.jsut_basic5000.dataset_config-None.dataset_split-test.language-ja.task-transcribe.stable-ts-None.punctuator-None.chunk_length-15.csv)
 - **プア／プワ**。Whisper large-v3 は `fleurs-0332` と `0334` で「トゥプワ」と出力した。Zuraw・Yu・Orfitelli はサモア語の一部の母音列で /u/ が [w] や [uw] として現れる例を報告する。一方、子音の直後では通常その転写をしなかったと明記している。Tupua の /p/ 直後への適用は実証されておらず、「プワ」と「ワッパー」ではワに対する子音の位置も異なる。[サモア語の音声研究、第8節](https://linguistics.ucla.edu/people/zuraw/dnldpprs/ZurawYuOrfitelli_Samoan_Phonology_2014.pdf)
@@ -150,7 +150,7 @@ kanasim（Apache-2.0）のコミット `f067a4e8be10d818b37b8b9f08de933dae01524b
 
 `transcripts.tsv` のイシイカオリ、ヤマモトユウスケ、サイトウ／サトウ、語尾の脱落などはライブラリの利用例を起点に作成した。`length-` の人工的な長音挿入や、同姓の別人を含む文、会議録、境界チェックも手作り。国籍やSTTモデルごとの発生頻度を示すデータではない。日本人名の清濁（ザ／サ）、促音化（キクコ／キッコ）、拗音（シュウ／シウ）、語中脱落、普通名詞「おさとう」を含む5文も手作りした。促音化の根拠は[発音研究との対応](#日本人名の資料をどこに反映したか)に記した。外国人名について以下の典拠から確認した差を組み込んだ。
 
-本文、登録する向き、マスクすべき人物、期待するコストはテスト用に設定した。和語・外来語の仮名遣いと先行研究は規則を設計するための参考資料として参照した。[規則の参考資料](#規則の参考資料)
+どちらの表記を探すか、本文、対象人物、期待コストはテスト用に決めた。規則の設計には、和語・外来語の仮名遣いと先行研究を参照した。[規則の参考資料](#規則の参考資料)
 
 - デビ／デービとデビス／デービス。[国立国会図書館の David McKee](https://id.ndl.go.jp/auth/ndlna/00449504)・[国際日本文化研究センターの Jerome Dean Davis](https://sekiei.nichibun.ac.jp/GAI/ja/detail/?gid=GH080003&hid=3509)
 - シェク／シェーク、ディケンズ／ディッケンズ、クリスティ／クリスティー。[Shakespeare](https://id.ndl.go.jp/auth/ndlna/00456207)・[Dickens](https://id.ndl.go.jp/auth/ndlna/00437850)・[Christie](https://id.ndl.go.jp/auth/ndlna/00435977)
